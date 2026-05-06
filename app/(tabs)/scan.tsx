@@ -2,20 +2,67 @@
  * Scan Screen — AI Fridge Scanner.
  */
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import GlassCard from '@/components/ui/GlassCard';
 import { BrandColors, Gradients, Radius, Spacing, Typography, Shadows } from '@/constants/theme';
-import { MOCK_SCANNED_INGREDIENTS, MOCK_RECIPES } from '@/constants/mock-data';
+import { MOCK_RECIPES } from '@/constants/mock-data';
+import { scanFridge } from '@/services/ai';
+
+interface ScannedIngredient {
+  name: string;
+  confidence: number;
+  icon: string;
+}
 
 export default function ScanScreen() {
   const [scanned, setScanned] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [ingredients, setIngredients] = useState<ScannedIngredient[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
 
   const toggleIngredient = (name: string) => {
     setSelected(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
+  };
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets[0].base64) {
+        setIsScanning(true);
+        setScanned(true); // Show the loading UI in the second view
+        
+        try {
+          const aiResult = await scanFridge(result.assets[0].base64);
+          // Convert string array to our ScannedIngredient format
+          const formatted = aiResult.map(name => ({
+            name,
+            confidence: 0.85 + Math.random() * 0.14, // Dummy confidence 85-99%
+            icon: 'check' // Default icon
+          }));
+          setIngredients(formatted);
+          setSelected(formatted.map(i => i.name)); // Auto-select all by default
+        } catch (e) {
+          console.error("AI Scan failed", e);
+          alert("Failed to analyze image with AI.");
+          setScanned(false);
+        } finally {
+          setIsScanning(false);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error picking image");
+    }
   };
 
   return (
@@ -37,12 +84,17 @@ export default function ScanScreen() {
                 <Text style={s.camText}>Tap to scan your fridge</Text>
                 <Text style={s.camHint}>Point your camera at the open fridge</Text>
               </LinearGradient>
-              <TouchableOpacity onPress={() => setScanned(true)} activeOpacity={0.85} style={{marginTop:Spacing.lg}}>
+              <TouchableOpacity onPress={pickImage} activeOpacity={0.85} style={{marginTop:Spacing.lg}}>
                 <LinearGradient colors={Gradients.primary as [string,string]} start={{x:0,y:0}} end={{x:1,y:0}} style={[s.scanBtn, Shadows.glow]}>
                   <Feather name="maximize" size={20} color="#fff" style={{marginRight:8}}/>
                   <Text style={s.scanBtnText}>Scan Now</Text>
                 </LinearGradient>
               </TouchableOpacity>
+            </View>
+          ) : isScanning ? (
+            <View style={{alignItems: 'center', justifyContent: 'center', marginTop: 100}}>
+               <ActivityIndicator size="large" color={BrandColors.primaryStart} />
+               <Text style={{color: BrandColors.textSecondary, marginTop: 16, ...Typography.body}}>Analyzing your ingredients with Gemini AI...</Text>
             </View>
           ) : (
             <>
@@ -50,14 +102,14 @@ export default function ScanScreen() {
                 <View style={s.resultRow}>
                   <Feather name="check-circle" size={28} color={BrandColors.success} />
                   <View style={{flex:1}}>
-                    <Text style={s.resultTitle}>{MOCK_SCANNED_INGREDIENTS.length} items detected</Text>
+                    <Text style={s.resultTitle}>{ingredients.length} items detected</Text>
                     <Text style={s.resultSub}>Tap to select ingredients for recipe matching</Text>
                   </View>
                 </View>
               </GlassCard>
 
               <View style={s.grid}>
-                {MOCK_SCANNED_INGREDIENTS.map((item) => {
+                {ingredients.map((item) => {
                   const isSelected = selected.includes(item.name);
                   return (
                     <TouchableOpacity key={item.name} onPress={() => toggleIngredient(item.name)} activeOpacity={0.7} style={s.ingCardWrapper}>
@@ -113,7 +165,7 @@ export default function ScanScreen() {
                 ))}
               </View>
 
-              <TouchableOpacity onPress={() => {setScanned(false);setSelected([]);}} style={{marginBottom:Spacing.xl}}>
+              <TouchableOpacity onPress={() => {setScanned(false);setIngredients([]);setSelected([]);}} style={{marginBottom:Spacing.xl}}>
                 <View style={s.rescanBtn}>
                   <Feather name="refresh-ccw" size={16} color={BrandColors.textSecondary} style={{marginRight:8}}/>
                   <Text style={s.rescanText}>Scan Again</Text>
