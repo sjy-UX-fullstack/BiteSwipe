@@ -1,29 +1,114 @@
-import { Link } from 'expo-router';
-import { StyleSheet } from 'react-native';
+/**
+ * Recipe Details Modal
+ */
+import React from 'react';
+import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BrandColors, Gradients, Radius, Spacing, Typography } from '@/constants/theme';
+import { MOCK_RECIPES } from '@/constants/mock-data';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+export default function RecipeModal() {
+  const { id } = useLocalSearchParams();
+  const router = useRouter();
+  
+  // Find recipe or fallback to first
+  const recipe = MOCK_RECIPES.find(r => r.id === id) || MOCK_RECIPES[0];
 
-export default function ModalScreen() {
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title">This is a modal</ThemedText>
-      <Link href="/" dismissTo style={styles.link}>
-        <ThemedText type="link">Go to home screen</ThemedText>
-      </Link>
-    </ThemedView>
+    <View style={s.screen}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+        <View style={s.imgWrap}>
+          <Image source={typeof recipe.image === 'string' ? { uri: recipe.image } : recipe.image} style={s.img} resizeMode="cover" />
+          <LinearGradient colors={['transparent', BrandColors.dark900]} style={s.imgOverlay} />
+        </View>
+
+        <View style={s.content}>
+          <View style={s.headerRow}>
+            <Text style={s.title}>{recipe.title}</Text>
+            <TouchableOpacity style={s.saveBtn}>
+              <Feather name="bookmark" size={24} color={BrandColors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+          
+          <Text style={s.cuisine}>{recipe.cuisine} • {recipe.difficulty}</Text>
+
+          <View style={s.stats}>
+            <View style={s.stat}>
+              <Feather name="clock" size={16} color={BrandColors.primaryStart} />
+              <Text style={s.statT}>{recipe.cookTime}</Text>
+            </View>
+            <View style={s.stat}>
+              <Feather name="zap" size={16} color={BrandColors.primaryStart} />
+              <Text style={s.statT}>{recipe.calories} cal</Text>
+            </View>
+            <View style={s.stat}>
+              <Feather name="users" size={16} color={BrandColors.primaryStart} />
+              <Text style={s.statT}>{recipe.servings} servings</Text>
+            </View>
+          </View>
+
+          <Text style={s.sectionTitle}>Ingredients</Text>
+          <View style={s.ingList}>
+            {recipe.ingredients.map((ing, i) => (
+              <View key={i} style={s.ingItem}>
+                <Feather name="check-circle" size={16} color={BrandColors.success} />
+                <Text style={s.ingText}>{ing}</Text>
+              </View>
+            ))}
+          </View>
+
+          <Text style={s.sectionTitle}>Instructions</Text>
+          <View style={s.stepList}>
+            {recipe.steps.map((step, i) => (
+              <View key={i} style={s.stepItem}>
+                <View style={s.stepNum}>
+                  <Text style={s.stepNumT}>{i + 1}</Text>
+                </View>
+                <Text style={s.stepText}>{step}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Floating Cook Action */}
+      <View style={s.bottomBar}>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => router.back()} style={{flex:1}}>
+          <LinearGradient colors={Gradients.primary as [string,string]} start={{x:0,y:0}} end={{x:1,y:0}} style={s.cookBtn}>
+            <Text style={s.cookBtnT}>Start Cooking</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  link: {
-    marginTop: 15,
-    paddingVertical: 15,
-  },
+const s = StyleSheet.create({
+  screen:{flex:1,backgroundColor:BrandColors.dark900},
+  scroll:{paddingBottom:100},
+  imgWrap:{width:'100%',aspectRatio:1},
+  img:{...StyleSheet.absoluteFillObject},
+  imgOverlay:{...StyleSheet.absoluteFillObject,top:'50%'},
+  content:{padding:Spacing.lg,marginTop:-Spacing.xl},
+  headerRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'flex-start',gap:Spacing.md},
+  title:{flex:1,color:BrandColors.textPrimary,...Typography.h1},
+  saveBtn:{padding:Spacing.xs},
+  cuisine:{color:BrandColors.textSecondary,...Typography.body,marginTop:Spacing.xxs},
+  stats:{flexDirection:'row',gap:Spacing.lg,marginTop:Spacing.md,marginBottom:Spacing.xl,backgroundColor:BrandColors.dark800,padding:Spacing.md,borderRadius:Radius.lg},
+  stat:{flexDirection:'row',alignItems:'center',gap:Spacing.xs},
+  statT:{color:BrandColors.textPrimary,...Typography.bodyBold},
+  sectionTitle:{color:BrandColors.textPrimary,...Typography.h2,marginBottom:Spacing.md,marginTop:Spacing.md},
+  ingList:{gap:Spacing.sm,marginBottom:Spacing.xl},
+  ingItem:{flexDirection:'row',alignItems:'center',gap:Spacing.sm},
+  ingText:{color:BrandColors.textSecondary,...Typography.body,flex:1},
+  stepList:{gap:Spacing.lg},
+  stepItem:{flexDirection:'row',gap:Spacing.md},
+  stepNum:{width:28,height:28,borderRadius:14,backgroundColor:BrandColors.dark600,alignItems:'center',justifyContent:'center'},
+  stepNumT:{color:BrandColors.primaryStart,fontWeight:'800'},
+  stepText:{color:BrandColors.textSecondary,...Typography.body,flex:1,lineHeight:22},
+  bottomBar:{position:'absolute',bottom:0,left:0,right:0,padding:Spacing.lg,backgroundColor:BrandColors.dark900,borderTopWidth:1,borderTopColor:BrandColors.glassBorder},
+  cookBtn:{paddingVertical:Spacing.md,borderRadius:Radius.full,alignItems:'center'},
+  cookBtnT:{color:'#fff',...Typography.bodyBold,fontSize:16},
 });
