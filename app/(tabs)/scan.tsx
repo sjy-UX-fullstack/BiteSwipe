@@ -60,7 +60,7 @@ function CameraScanner({ onCapture, onClose }: { onCapture: (base64: string) => 
     if (!cameraRef.current || capturing) return;
     setCapturing(true);
     try {
-      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.6, skipProcessing: true });
+      const photo = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.4, skipProcessing: true });
       if (photo?.base64) onCapture(photo.base64);
     } catch (e) {
       console.error('Capture failed', e);
@@ -156,7 +156,7 @@ function CameraScanner({ onCapture, onClose }: { onCapture: (base64: string) => 
           {/* Gallery fallback */}
           <TouchableOpacity
             onPress={async () => {
-              const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true });
+              const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.4, base64: true });
               if (!res.canceled && res.assets[0].base64) onCapture(res.assets[0].base64);
             }}
             style={cs.iconBtn}
@@ -206,8 +206,14 @@ export default function ScanScreen() {
       setIngredients(formatted);
       setSelected(formatted.map(i => i.name));
       setMode('results');
-    } catch {
-      alert('AI scan failed. Check your internet connection.');
+    } catch (err: any) {
+      console.error('[scanFridge] error:', err);
+      const msg = err?.message ?? String(err);
+      const isKeyMissing = msg.includes('API_KEY') || msg.includes('API key') || msg.includes('INVALID_ARGUMENT');
+      alert(isKeyMissing
+        ? 'Gemini API key not configured. Please contact support.'
+        : `Scan failed: ${msg.slice(0, 120)}`
+      );
       setMode('home');
     }
   };
@@ -216,7 +222,7 @@ export default function ScanScreen() {
   const handleWebPick = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { alert('Photo library permission required.'); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.6, base64: true });
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.4, base64: true });
     if (!res.canceled && res.assets[0].base64) {
       setMode('analysing');
       await handleCapture(res.assets[0].base64);
