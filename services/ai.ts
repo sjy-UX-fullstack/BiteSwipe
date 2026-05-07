@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Platform } from 'react-native';
 
 const API_KEY = process.env.EXPO_PUBLIC_GEMINI_KEY ?? '';
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -6,8 +7,24 @@ const MODEL = "gemini-2.0-flash";
 
 /**
  * Sends a base64 encoded image to Gemini to extract ingredients.
+ * On web: proxied through /api/scan to avoid CORS / geo-blocking.
+ * On native: calls Gemini directly.
  */
 export const scanFridge = async (base64Image: string, mimeType: string = 'image/jpeg'): Promise<string[]> => {
+  if (Platform.OS === 'web') {
+    const res = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64: base64Image, mimeType }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ?? `Server error ${res.status}`);
+    }
+    const data = await res.json();
+    return data.ingredients ?? [];
+  }
+
   const model = genAI.getGenerativeModel({ model: MODEL });
   const prompt = `You are a professional chef. Look at this image of a fridge or pantry.
 Identify all the edible food ingredients visible.
