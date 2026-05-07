@@ -209,11 +209,7 @@ export default function ScanScreen() {
     } catch (err: any) {
       console.error('[scanFridge] error:', err);
       const msg = err?.message ?? String(err);
-      const isKeyMissing = msg.includes('API_KEY') || msg.includes('API key') || msg.includes('INVALID_ARGUMENT');
-      alert(isKeyMissing
-        ? 'Gemini API key not configured. Please contact support.'
-        : `Scan failed: ${msg.slice(0, 120)}`
-      );
+      alert(`Scan failed: ${msg.slice(0, 400)}`);
       setMode('home');
     }
   };
