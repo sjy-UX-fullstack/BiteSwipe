@@ -18,14 +18,7 @@ import { BrandColors, Gradients, Radius, Spacing, Typography, Shadows } from '@/
 import { MOCK_RECIPES } from '@/constants/mock-data';
 import { scanFridge } from '@/services/ai';
 
-// expo-camera only works on native — import lazily so web doesn't crash
-let CameraView: any = null;
-let useCameraPermissions: any = null;
-if (Platform.OS !== 'web') {
-  const cam = require('expo-camera');
-  CameraView = cam.CameraView;
-  useCameraPermissions = cam.useCameraPermissions;
-}
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 const { height: SCREEN_H, width: SCREEN_W } = Dimensions.get('window');
 
@@ -245,8 +238,8 @@ export default function ScanScreen() {
     .sort((a, b) => (b.matchPercentage ?? 0) - (a.matchPercentage ?? 0))
     .slice(0, 3);
 
-  // ── Camera view (full screen, native only) ──
-  if (mode === 'camera' && Platform.OS !== 'web') {
+  // ── Camera view (full screen, all platforms) ──
+  if (mode === 'camera') {
     return (
       <CameraScanner
         onCapture={handleCapture}
@@ -293,9 +286,7 @@ export default function ScanScreen() {
             <Feather name="camera" size={28} color={BrandColors.primaryStart} />
           </View>
           <Text style={s.desc}>
-            {Platform.OS === 'web'
-              ? 'Upload a photo of your fridge and our AI will identify ingredients and suggest recipes!'
-              : 'Open your camera and point at your fridge — AI identifies everything instantly!'}
+            Open your camera and point at your fridge — AI identifies every ingredient instantly!
           </Text>
 
           {mode === 'home' && (
@@ -309,40 +300,29 @@ export default function ScanScreen() {
                 <View style={[s.corner, s.cornerBR]} />
                 <View style={s.viewfinderCenter}>
                   <Feather name="aperture" size={52} color={BrandColors.primaryStart} style={{ opacity: 0.7 }} />
-                  <Text style={s.camText}>
-                    {Platform.OS === 'web' ? 'Upload fridge photo' : 'Tap to open camera'}
-                  </Text>
-                  <Text style={s.camHint}>
-                    {Platform.OS === 'web' ? 'Select from your gallery' : 'Works best with the fridge door open'}
-                  </Text>
+                  <Text style={s.camText}>Tap to open camera</Text>
+                  <Text style={s.camHint}>Works best with the fridge door open</Text>
                 </View>
               </View>
 
               {/* Scan button with pulse */}
               <Animated.View style={{ transform: [{ scale: pulseAnim }], marginTop: Spacing.xl }}>
-                <TouchableOpacity
-                  onPress={Platform.OS === 'web' ? handleWebPick : () => setMode('camera')}
-                  activeOpacity={0.85}
-                >
+                <TouchableOpacity onPress={() => setMode('camera')} activeOpacity={0.85}>
                   <LinearGradient
                     colors={Gradients.primary as [string, string]}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                     style={[s.scanBtn, Shadows.glow]}
                   >
-                    <Feather name={Platform.OS === 'web' ? 'upload' : 'camera'} size={22} color="#fff" style={{ marginRight: 10 }} />
-                    <Text style={s.scanBtnText}>
-                      {Platform.OS === 'web' ? 'Upload Photo' : 'Open Camera Scanner'}
-                    </Text>
+                    <Feather name="camera" size={22} color="#fff" style={{ marginRight: 10 }} />
+                    <Text style={s.scanBtnText}>Open Camera Scanner</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </Animated.View>
 
-              {Platform.OS !== 'web' && (
-                <TouchableOpacity onPress={handleWebPick} style={s.galleryLink}>
-                  <Feather name="image" size={16} color={BrandColors.textTertiary} style={{ marginRight: 6 }} />
-                  <Text style={s.galleryLinkT}>Or choose from gallery</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity onPress={handleWebPick} style={s.galleryLink}>
+                <Feather name="image" size={16} color={BrandColors.textTertiary} style={{ marginRight: 6 }} />
+                <Text style={s.galleryLinkT}>Or choose from gallery</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -357,7 +337,7 @@ export default function ScanScreen() {
                     <Text style={s.resultTitle}>{ingredients.length} ingredients found!</Text>
                     <Text style={s.resultSub}>Tap any to deselect</Text>
                   </View>
-                  <TouchableOpacity onPress={() => Platform.OS === 'web' ? handleWebPick() : setMode('camera')}>
+                  <TouchableOpacity onPress={() => setMode('camera')}>
                     <View style={s.rescanSmall}>
                       <Feather name="refresh-ccw" size={14} color={BrandColors.primaryStart} />
                     </View>
