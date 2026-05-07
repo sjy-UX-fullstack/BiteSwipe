@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 
 const API_KEY = process.env.EXPO_PUBLIC_GEMINI_KEY ?? '';
 const genAI = new GoogleGenerativeAI(API_KEY);
-const MODEL = "gemini-2.0-flash";
+const MODEL = "gemini-1.5-flash";
 
 /**
  * Sends a base64 encoded image to Gemini to extract ingredients.
