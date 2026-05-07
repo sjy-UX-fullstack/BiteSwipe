@@ -19,7 +19,8 @@ export const scanFridge = async (base64Image: string, mimeType: string = 'image/
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.error ?? `Server error ${res.status}`);
+      const detail = body.details ? ` — ${body.details}` : '';
+      throw new Error((body.error ?? `Server error ${res.status}`) + detail);
     }
     const data = await res.json();
     return data.ingredients ?? [];

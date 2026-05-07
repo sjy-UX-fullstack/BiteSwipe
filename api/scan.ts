@@ -1,14 +1,16 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } },
 };
 
+const PROMPT = `You are a professional chef. Look at this image of a fridge or pantry.
+Identify all the edible food ingredients visible.
+Return ONLY a valid JSON array of strings with ingredient names.
+Example: ["eggs", "milk", "tomatoes"]`;
+
 export default async function handler(req: any, res: any) {
-  // Health check
   if (req.method === 'GET') {
     const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_KEY;
-    return res.status(200).json({ status: 'ok', hasKey: !!apiKey });
+    return res.status(200).json({ status: 'ok', hasKey: !!apiKey, keyLen: apiKey?.length ?? 0 });
   }
 
   if (req.method !== 'POST') {
@@ -23,32 +25,52 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server' });
   }
 
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const body = {
+    contents: [{
+      parts: [
+        { text: PROMPT },
+        { inlineData: { mimeType, data: base64 } },
+      ],
+    }],
+  };
+
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
 
-    const prompt = `You are a professional chef. Look at this image of a fridge or pantry.
-Identify all the edible food ingredients visible.
-Return ONLY a valid JSON array of strings with ingredient names.
-Example: ["eggs", "milk", "tomatoes"]`;
+    const raw = await r.text();
+    if (!r.ok) {
+      console.error('[api/scan] google error', r.status, raw);
+      return res.status(r.status).json({
+        error: `Gemini API ${r.status}`,
+        details: raw.slice(0, 500),
+      });
+    }
 
-    const result = await model.generateContent([
-      prompt,
-      { inlineData: { data: base64, mimeType } },
-    ]);
+    let data: any;
+    try { data = JSON.parse(raw); } catch {
+      return res.status(500).json({ error: 'Invalid JSON from Gemini', details: raw.slice(0, 300) });
+    }
 
-    const text = result.response.text();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     const start = text.indexOf('[');
     const end = text.lastIndexOf(']');
-
     if (start !== -1 && end !== -1) {
-      const ingredients = JSON.parse(text.substring(start, end + 1));
-      return res.status(200).json({ ingredients });
+      try {
+        const ingredients = JSON.parse(text.substring(start, end + 1));
+        return res.status(200).json({ ingredients });
+      } catch (e: any) {
+        return res.status(200).json({ ingredients: [], parseError: e?.message });
+      }
     }
-    return res.status(200).json({ ingredients: [] });
+    return res.status(200).json({ ingredients: [], rawText: text.slice(0, 300) });
   } catch (err: any) {
     const msg = err?.message ?? String(err);
-    console.error('[api/scan] error:', msg);
-    return res.status(500).json({ error: msg });
+    console.error('[api/scan] fetch error:', msg);
+    return res.status(500).json({ error: `Network: ${msg}` });
   }
 }
