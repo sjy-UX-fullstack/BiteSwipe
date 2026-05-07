@@ -54,7 +54,7 @@ export const MOCK_RECIPES: Recipe[] = [
     difficulty: 'Medium',
     calories: 480,
     servings: 4,
-    image: require('../assets/food/butter_chicken.png'),
+    image: require('../assets/food/butter_chicken.jpg'),
     icon: 'coffee', // Feather icon equivalent for food/pot
     category: 'dinner',
     tags: ['Dinner', 'Protein-Rich', 'Comfort Food'],
@@ -80,7 +80,7 @@ export const MOCK_RECIPES: Recipe[] = [
     difficulty: 'Easy',
     calories: 320,
     servings: 2,
-    image: require('../assets/food/avocado_toast.png'),
+    image: require('../assets/food/avocado_toast.jpg'),
     icon: 'star',
     category: 'breakfast',
     tags: ['Breakfast', 'Healthy', 'Quick'],
@@ -106,7 +106,7 @@ export const MOCK_RECIPES: Recipe[] = [
     difficulty: 'Medium',
     calories: 650,
     servings: 2,
-    image: require('../assets/food/spicy_ramen.png'),
+    image: require('../assets/food/spicy_ramen.jpg'),
     icon: 'wind',
     category: 'dinner',
     tags: ['Dinner', 'Spicy', 'Noodles'],
@@ -132,7 +132,7 @@ export const MOCK_RECIPES: Recipe[] = [
     difficulty: 'Medium',
     calories: 550,
     servings: 4,
-    image: require('../assets/food/pizza.png'),
+    image: require('../assets/food/pizza.jpg'),
     icon: 'aperture',
     category: 'dinner',
     tags: ['Dinner', 'Vegetarian', 'Cheesy'],
@@ -158,7 +158,7 @@ export const MOCK_RECIPES: Recipe[] = [
     difficulty: 'Hard',
     calories: 410,
     servings: 2,
-    image: require('../assets/food/sushi.png'),
+    image: require('../assets/food/sushi.jpg'),
     icon: 'target',
     tags: ['Dinner', 'Seafood', 'Date Night'],
     matchPercentage: 65,
@@ -183,7 +183,7 @@ export const MOCK_RECIPES: Recipe[] = [
     difficulty: 'Easy',
     calories: 280,
     servings: 1,
-    image: require('../assets/food/smoothie_bowl.png'),
+    image: require('../assets/food/smoothie_bowl.jpg'),
     icon: 'sun',
     tags: ['Breakfast', 'Healthy', 'Summer'],
     matchPercentage: 83,
@@ -209,7 +209,7 @@ export const MOCK_TRENDING: TrendingItem[] = [
     source: 'instagram',
     creator: '@thefeedfeed',
     views: '4.2M',
-    image: require('../assets/food/avocado_toast.png'), // Reusing for mock
+    image: require('../assets/food/avocado_toast.jpg'), // Reusing for mock
     icon: 'cloud',
   },
   {
@@ -218,7 +218,7 @@ export const MOCK_TRENDING: TrendingItem[] = [
     source: 'youtube',
     creator: 'Joshua Weissman',
     views: '8.1M',
-    image: require('../assets/food/pizza.png'), // Reusing for mock
+    image: require('../assets/food/pizza.jpg'), // Reusing for mock
     icon: 'package',
   },
   {
@@ -227,7 +227,7 @@ export const MOCK_TRENDING: TrendingItem[] = [
     source: 'instagram',
     creator: '@senpaiknows',
     views: '6.7M',
-    image: require('../assets/food/spicy_ramen.png'), // Reusing for mock
+    image: require('../assets/food/spicy_ramen.jpg'), // Reusing for mock
     icon: 'map-pin',
   },
   {
@@ -236,7 +236,7 @@ export const MOCK_TRENDING: TrendingItem[] = [
     source: 'youtube',
     creator: 'Gordon Ramsay',
     views: '12.3M',
-    image: require('../assets/food/butter_chicken.png'), // Reusing for mock
+    image: require('../assets/food/butter_chicken.jpg'), // Reusing for mock
     icon: 'droplet',
   },
 ];
@@ -249,7 +249,7 @@ export const MOCK_FEED: FeedPost[] = [
     userAvatar: 'user', // Feather icon
     timeAgo: '2h ago',
     recipeName: 'Paneer Tikka',
-    image: require('../assets/food/butter_chicken.png'),
+    image: require('../assets/food/butter_chicken.jpg'),
     icon: 'zap',
     likes: 234,
     comments: 18,
@@ -263,7 +263,7 @@ export const MOCK_FEED: FeedPost[] = [
     userAvatar: 'user',
     timeAgo: '5h ago',
     recipeName: 'Chocolate Lava Cake',
-    image: require('../assets/food/pizza.png'),
+    image: require('../assets/food/pizza.jpg'),
     icon: 'alert-circle',
     likes: 567,
     comments: 42,

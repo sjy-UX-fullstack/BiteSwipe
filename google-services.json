@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "663641928631",
+    "project_id": "biteswipe-deb40",
+    "storage_bucket": "biteswipe-deb40.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:663641928631:android:ecc7d39f4506c86cf52e32",
+        "android_client_info": {
+          "package_name": "com.webvoyant.biteswipe"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "663641928631-b0dj4mj6ioqk0hj2r57q32355mg8kiqe.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB71kMXRQ1PuN2yHICxHdCyh1RrPfNh108"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "663641928631-b0dj4mj6ioqk0hj2r57q32355mg8kiqe.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

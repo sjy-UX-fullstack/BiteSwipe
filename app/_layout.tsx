@@ -5,11 +5,13 @@
  */
 
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View, ActivityIndicator } from 'react-native';
 import { BrandColors } from '@/constants/theme';
+import { AuthProvider, useAuth } from '@/hooks/useAuth';
+import { useEffect } from 'react';
 
 // Custom dark theme matching our brand
 const BiteSwipeTheme = {
@@ -29,10 +31,38 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
-export default function RootLayout() {
-  const content = (
+function RootLayoutNav() {
+  const { user, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+
+    const inAuthGroup = segments[0] === 'login' || segments[0] === 'signup';
+
+    if (!user && !inAuthGroup) {
+      // Redirect to the sign-in page.
+      router.replace('/login');
+    } else if (user && inAuthGroup) {
+      // Redirect away from the sign-in page.
+      router.replace('/(tabs)');
+    }
+  }, [user, loading, segments]);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: BrandColors.dark900 }}>
+        <ActivityIndicator size="large" color={BrandColors.primaryStart} />
+      </View>
+    );
+  }
+
+  return (
     <ThemeProvider value={BiteSwipeTheme}>
       <Stack>
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="signup" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="modal"
@@ -63,6 +93,14 @@ export default function RootLayout() {
       </Stack>
       <StatusBar style="light" />
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  const content = (
+    <AuthProvider>
+      <RootLayoutNav />
+    </AuthProvider>
   );
 
   // If on web, wrap the entire app in a centered mobile frame
