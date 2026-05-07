@@ -90,6 +90,22 @@ function RootLayoutNav() {
             headerTintColor: BrandColors.textPrimary,
           }}
         />
+        <Stack.Screen
+          name="trending-recipe"
+          options={{
+            presentation: 'modal',
+            title: 'Recipe',
+            headerStyle: { backgroundColor: BrandColors.dark800 },
+            headerTintColor: BrandColors.textPrimary,
+          }}
+        />
+        <Stack.Screen
+          name="cook-mode"
+          options={{
+            presentation: 'fullScreenModal',
+            headerShown: false,
+          }}
+        />
       </Stack>
       <StatusBar style="light" />
     </ThemeProvider>

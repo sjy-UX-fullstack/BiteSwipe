@@ -1,75 +1,102 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialize Gemini API
-// IMPORTANT: In production, never hardcode API keys in the client. Use a backend or secure .env
-const API_KEY = "AIzaSyBlK4Fg29oz8EKdqdQ3z0KZ_i02x8KE7MA";
+const API_KEY = process.env.EXPO_PUBLIC_GEMINI_KEY ?? '';
 const genAI = new GoogleGenerativeAI(API_KEY);
+const MODEL = "gemini-2.0-flash";
 
 /**
  * Sends a base64 encoded image to Gemini to extract ingredients.
- * @param base64Image The base64 string of the image
- * @param mimeType The mime type of the image (e.g. 'image/jpeg')
- * @returns Array of ingredient strings
  */
 export const scanFridge = async (base64Image: string, mimeType: string = 'image/jpeg'): Promise<string[]> => {
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: MODEL });
+  const prompt = `You are a professional chef. Look at this image of a fridge or pantry.
+Identify all the edible food ingredients visible.
+Return ONLY a valid JSON array of strings containing the ingredient names.
+Example: ["eggs", "milk", "tomatoes"]`;
 
-    const prompt = "You are a professional chef. Look at this image of a fridge or pantry. Identify all the edible food ingredients visible. Return ONLY a valid JSON array of strings containing the ingredient names. Example: [\"eggs\", \"milk\", \"tomatoes\"]";
+  const result = await model.generateContent([
+    prompt,
+    { inlineData: { data: base64Image, mimeType } },
+  ]);
 
-    const imageParts = [
-      {
-        inlineData: {
-          data: base64Image,
-          mimeType
-        },
-      },
-    ];
-
-    const result = await model.generateContent([prompt, ...imageParts]);
-    const response = await result.response;
-    const text = response.text();
-    
-    // Attempt to parse the JSON array from the response
+  const text = result.response.text();
+  const start = text.indexOf('[');
+  const end = text.lastIndexOf(']');
+  if (start !== -1 && end !== -1) {
     try {
-      // Find the first '[' and last ']' to extract just the array in case of markdown formatting
-      const startIndex = text.indexOf('[');
-      const endIndex = text.lastIndexOf(']');
-      if (startIndex !== -1 && endIndex !== -1) {
-        const jsonString = text.substring(startIndex, endIndex + 1);
-        return JSON.parse(jsonString);
-      }
-      return [];
-    } catch (parseError) {
-      console.error("Failed to parse Gemini JSON output:", text);
+      return JSON.parse(text.substring(start, end + 1));
+    } catch {
       return [];
     }
-  } catch (error) {
-    console.error("Error calling Gemini API:", error);
-    throw error;
   }
+  return [];
 };
 
 /**
- * Prompts Gemini to generate a recipe based on ingredients or parse a URL.
+ * Asks Gemini to generate a full recipe from a title or URL text.
+ * NOTE: Gemini cannot browse URLs — pass text/title only.
  */
 export const parseRecipeText = async (textToParse: string): Promise<any> => {
+  const model = genAI.getGenerativeModel({ model: MODEL });
+  const prompt = `Extract or generate recipe information from this text or title.
+Return ONLY valid JSON in this exact format:
+{"title":"Recipe Name","ingredients":["ing1","ing2"],"steps":["step1","step2"],"calories":400,"cookTime":"20 min","difficulty":"Medium","cuisine":"Italian"}
+Text: ${textToParse}`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start !== -1 && end !== -1) {
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        const prompt = `Extract recipe information from the following text/url. Return ONLY valid JSON in this format: {"title": "Recipe Name", "ingredients": ["ing1", "ing2"], "steps": ["step1", "step2"], "calories": 400, "cookTime": "20 min", "difficulty": "Medium"}. Text: ${textToParse}`;
-        
-        const result = await model.generateContent(prompt);
-        const text = result.response.text();
-        
-        const startIndex = text.indexOf('{');
-        const endIndex = text.lastIndexOf('}');
-        if (startIndex !== -1 && endIndex !== -1) {
-          const jsonString = text.substring(startIndex, endIndex + 1);
-          return JSON.parse(jsonString);
-        }
-        return null;
-    } catch (e) {
-        console.error("Error parsing recipe text", e);
-        return null;
+      return JSON.parse(text.substring(start, end + 1));
+    } catch {
+      return null;
     }
-}
+  }
+  return null;
+};
+
+/**
+ * Generates a batch of trending recipe ideas for the week.
+ * Used by the weekly viral recipe pull service.
+ */
+export const generateViralRecipes = async (): Promise<any[]> => {
+  const model = genAI.getGenerativeModel({ model: MODEL });
+  const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+  const prompt = `You are a food trend analyst. Generate 6 viral, trending recipe ideas for ${currentMonth} that are popular on Instagram Reels and YouTube Shorts in India and globally.
+Return ONLY a valid JSON array with exactly 6 objects in this format:
+[
+  {
+    "id": "viral_1",
+    "title": "Recipe Title",
+    "cuisine": "Indian/Italian/etc",
+    "cookTime": "25 min",
+    "difficulty": "Easy",
+    "calories": 450,
+    "servings": 2,
+    "source": "instagram",
+    "creator": "@creatorname",
+    "views": "4.2M",
+    "icon": "zap",
+    "tags": ["Trending", "Quick"],
+    "ingredients": ["ing1", "ing2", "ing3"],
+    "steps": ["step1", "step2", "step3"],
+    "matchPercentage": 82
+  }
+]
+Make them genuinely exciting, globally trending but cook-friendly. Mix indian and global cuisine.`;
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+  const start = text.indexOf('[');
+  const end = text.lastIndexOf(']');
+  if (start !== -1 && end !== -1) {
+    try {
+      return JSON.parse(text.substring(start, end + 1));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};

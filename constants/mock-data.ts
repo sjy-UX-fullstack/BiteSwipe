@@ -13,6 +13,7 @@ export interface Recipe {
   servings: number;
   image: any;
   icon: string;
+  category: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'healthy';
   tags: string[];
   ingredients: string[];
   steps: string[];
@@ -160,6 +161,7 @@ export const MOCK_RECIPES: Recipe[] = [
     servings: 2,
     image: require('../assets/food/sushi.jpg'),
     icon: 'target',
+    category: 'dinner',
     tags: ['Dinner', 'Seafood', 'Date Night'],
     matchPercentage: 65,
     ingredients: [
@@ -185,6 +187,7 @@ export const MOCK_RECIPES: Recipe[] = [
     servings: 1,
     image: require('../assets/food/smoothie_bowl.jpg'),
     icon: 'sun',
+    category: 'breakfast',
     tags: ['Breakfast', 'Healthy', 'Summer'],
     matchPercentage: 83,
     ingredients: [

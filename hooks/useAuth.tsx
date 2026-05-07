@@ -30,11 +30,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Timeout fallback: if Firebase doesn't respond in 5s, unblock the app
+    const timeout = setTimeout(() => setLoading(false), 5000);
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      clearTimeout(timeout);
       setUser(currentUser);
       setLoading(false);
+    }, () => {
+      // Auth error (e.g. network) — unblock and show login
+      clearTimeout(timeout);
+      setLoading(false);
     });
-    return unsubscribe;
+
+    return () => {
+      clearTimeout(timeout);
+      unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, pass: string) => {
