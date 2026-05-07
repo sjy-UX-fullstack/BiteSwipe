@@ -5,6 +5,12 @@ export const config = {
 };
 
 export default async function handler(req: any, res: any) {
+  // Health check
+  if (req.method === 'GET') {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_KEY;
+    return res.status(200).json({ status: 'ok', hasKey: !!apiKey });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -12,8 +18,10 @@ export default async function handler(req: any, res: any) {
   const { base64, mimeType = 'image/jpeg' } = req.body ?? {};
   if (!base64) return res.status(400).json({ error: 'base64 required' });
 
-  const apiKey = process.env.EXPO_PUBLIC_GEMINI_KEY;
-  if (!apiKey) return res.status(500).json({ error: 'API key not configured on server' });
+  const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_KEY;
+  if (!apiKey) {
+    return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server' });
+  }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -39,7 +47,8 @@ Example: ["eggs", "milk", "tomatoes"]`;
     }
     return res.status(200).json({ ingredients: [] });
   } catch (err: any) {
-    console.error('[api/scan] Gemini error:', err?.message ?? err);
-    return res.status(500).json({ error: err?.message ?? 'Gemini call failed' });
+    const msg = err?.message ?? String(err);
+    console.error('[api/scan] error:', msg);
+    return res.status(500).json({ error: msg });
   }
 }
