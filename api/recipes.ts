@@ -5,7 +5,7 @@ export const config = {
 const MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-function buildPrompt(ingredients: string[], diet: string) {
+function buildPrompt(ingredients: string[], diet: string, allergens: string[]) {
   const dietRule =
     diet === 'vegan'
       ? 'STRICTLY VEGAN: no meat, fish, eggs, dairy, honey, ghee, butter, paneer, yogurt.'
@@ -13,9 +13,13 @@ function buildPrompt(ingredients: string[], diet: string) {
       ? 'STRICTLY VEGETARIAN: no meat, fish, seafood. Dairy and eggs OK.'
       : 'NON-VEGETARIAN: meat, fish, eggs, dairy all fine.';
 
+  const allergenRule = allergens.length > 0
+    ? `\nAllergens to AVOID completely: ${allergens.join(', ')}. Substitute or skip ingredients containing them.`
+    : '';
+
   return `You are BiteSwipe AI, a precise home chef.
 Available: ${ingredients.join(', ')}
-Diet: ${dietRule}
+Diet: ${dietRule}${allergenRule}
 Always include these pantry basics in every recipe: salt, oil (any), and 2-3 relevant spices from [cumin/caraway, turmeric/paprika, coriander/oregano, garam masala/Italian seasoning, chili/pepper, garlic powder/fresh garlic].
 
 Generate 5 recipes using the available ingredients. Return ONLY a valid JSON array of 5 objects, no prose:
@@ -40,10 +44,13 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { ingredients, diet = 'none' } = req.body ?? {};
+  const { ingredients, diet = 'none', allergens = [] } = req.body ?? {};
   if (!Array.isArray(ingredients) || ingredients.length === 0) {
     return res.status(400).json({ error: 'ingredients[] required' });
   }
+  const safeAllergens: string[] = Array.isArray(allergens)
+    ? allergens.filter((a: unknown) => typeof a === 'string')
+    : [];
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -53,7 +60,7 @@ export default async function handler(req: any, res: any) {
   const body = {
     model: MODEL,
     messages: [
-      { role: 'user', content: buildPrompt(ingredients, diet) },
+      { role: 'user', content: buildPrompt(ingredients, diet, safeAllergens) },
     ],
     temperature: 0.5,
     max_tokens: 2800,

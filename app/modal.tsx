@@ -1,29 +1,63 @@
 /**
  * Recipe Details Modal
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, Image, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, Gradients, Radius, Spacing, Typography } from '@/constants/theme';
 import { MOCK_RECIPES } from '@/constants/mock-data';
+import { isRecipeSaved, saveRecipe, unsaveRecipe } from '@/services/savedRecipes';
 
 export default function RecipeModal() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [bookmarked, setBookmarked] = useState(false);
+  const [bookmarkBusy, setBookmarkBusy] = useState(false);
 
   const recipe = MOCK_RECIPES.find(r => r.id === id) || MOCK_RECIPES[0];
 
-  const toggleBookmark = () => {
-    setBookmarked(prev => {
-      const next = !prev;
+  useEffect(() => {
+    (async () => {
+      setBookmarked(await isRecipeSaved(recipe.id));
+    })();
+  }, [recipe.id]);
+
+  const toggleBookmark = async () => {
+    if (bookmarkBusy) return;
+    setBookmarkBusy(true);
+    const next = !bookmarked;
+    setBookmarked(next);  // optimistic
+    try {
+      if (next) {
+        await saveRecipe({
+          id: recipe.id,
+          title: recipe.title,
+          cuisine: recipe.cuisine,
+          cookTime: recipe.cookTime,
+          difficulty: recipe.difficulty,
+          calories: recipe.calories,
+          servings: recipe.servings,
+          ingredients: recipe.ingredients,
+          steps: recipe.steps,
+          tags: recipe.tags,
+          source: 'mock',
+        });
+      } else {
+        await unsaveRecipe(recipe.id);
+      }
       const msg = next ? `"${recipe.title}" saved to your collection!` : `"${recipe.title}" removed from saved.`;
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert(next ? 'Saved!' : 'Removed', msg);
-      return next;
-    });
+    } catch (e: any) {
+      setBookmarked(!next);  // rollback
+      const msg = e?.message ?? 'Could not update saved.';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setBookmarkBusy(false);
+    }
   };
 
   const handleStartCooking = () => {
@@ -32,6 +66,8 @@ export default function RecipeModal() {
       params: {
         title: recipe.title,
         steps: JSON.stringify(recipe.steps),
+        recipeId: recipe.id,
+        source: 'mock',
       },
     });
   };

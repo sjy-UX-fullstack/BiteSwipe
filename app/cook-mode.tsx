@@ -10,12 +10,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { BrandColors, Gradients, Radius, Spacing, Typography } from '@/constants/theme';
+import { logCook } from '@/services/cookHistory';
 
 const { width: SW } = Dimensions.get('window');
 
 export default function CookModeScreen() {
   const router = useRouter();
-  const { title, steps: stepsJson } = useLocalSearchParams<{ title: string; steps: string }>();
+  const { title, steps: stepsJson, recipeId, source } = useLocalSearchParams<{
+    title: string;
+    steps: string;
+    recipeId?: string;
+    source?: string;
+  }>();
   const steps: string[] = JSON.parse(stepsJson || '[]');
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -57,8 +63,15 @@ export default function CookModeScreen() {
     } else {
       if (intervalRef.current) clearInterval(intervalRef.current);
       setDone(true);
+      // Log to history (fire-and-forget; ok if user is signed out)
+      logCook({
+        recipeId: recipeId || undefined,
+        title: title || 'Recipe',
+        source: (source === 'ai' || source === 'mock' || source === 'trending') ? source : 'mock',
+        durationSec: timerSeconds,
+      }).catch(() => {});
     }
-  }, [currentStep, steps.length]);
+  }, [currentStep, steps.length, recipeId, title, source, timerSeconds]);
 
   const goPrev = useCallback(() => {
     if (currentStep > 0) {

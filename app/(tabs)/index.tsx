@@ -35,11 +35,20 @@ export default function HomeScreen() {
                 <Text style={styles.heroAccent}>today?</Text>
               </Text>
             </View>
-            <TouchableOpacity style={styles.avatar} onPress={() => router.push('/profile')}>
-              <LinearGradient colors={Gradients.primary as [string, string]} style={styles.avatarGradient}>
-                <Feather name="user" size={24} color="#fff" />
-              </LinearGradient>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => router.push('/saved' as any)}
+                style={styles.headerIconBtn}
+                hitSlop={8}
+              >
+                <Feather name="bookmark" size={20} color={BrandColors.textPrimary} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.avatar} onPress={() => router.push('/profile')}>
+                <LinearGradient colors={Gradients.primary as [string, string]} style={styles.avatarGradient}>
+                  <Feather name="user" size={24} color="#fff" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Quick Actions */}
@@ -177,6 +186,7 @@ const styles = StyleSheet.create({
   heroAccent: { color: BrandColors.primaryStart },
   avatar: { marginTop: Spacing.xxs },
   avatarGradient: { width: 48, height: 48, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
+  headerIconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: BrandColors.glass, borderWidth: 1, borderColor: BrandColors.glassBorder, alignItems: 'center', justifyContent: 'center' },
   quickActions: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.lg },
   quickAction: { flex: 1, padding: Spacing.sm },
   quickActionInner: { alignItems: 'center', gap: Spacing.xs },

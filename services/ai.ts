@@ -74,6 +74,7 @@ export interface AIRecipe {
 export const generateRecipesFromIngredients = async (
   ingredients: string[],
   diet: DietPreference,
+  allergens: string[] = [],
 ): Promise<AIRecipe[]> => {
   const url = Platform.OS === 'web'
     ? '/api/recipes'
@@ -82,7 +83,7 @@ export const generateRecipesFromIngredients = async (
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ingredients, diet }),
+    body: JSON.stringify({ ingredients, diet, allergens }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

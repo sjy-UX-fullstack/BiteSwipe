@@ -1,17 +1,29 @@
 /**
  * User Profile Modal
  */
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { BrandColors, Gradients, Radius, Spacing, Typography } from '@/constants/theme';
 import { useAuth } from '@/hooks/useAuth';
+import { countSaved } from '@/services/savedRecipes';
+import { countCooked } from '@/services/cookHistory';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const router = useRouter();
+  const [savedCount, setSavedCount] = useState<number | null>(null);
+  const [cookedCount, setCookedCount] = useState<number | null>(null);
+
+  useFocusEffect(useCallback(() => {
+    (async () => {
+      const [s, c] = await Promise.all([countSaved(), countCooked()]);
+      setSavedCount(s);
+      setCookedCount(c);
+    })();
+  }, []));
 
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'Chef';
   const handle = '@' + (user?.email?.split('@')[0] || 'user').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -52,40 +64,42 @@ export default function ProfileScreen() {
           {user?.email && <Text style={s.email}>{user.email}</Text>}
 
           <View style={s.stats}>
-            <View style={s.stat}>
-              <Text style={s.statV}>12</Text>
+            <TouchableOpacity style={s.stat} onPress={() => router.push('/saved' as any)}>
+              <Text style={s.statV}>{cookedCount ?? '–'}</Text>
               <Text style={s.statL}>Cooked</Text>
-            </View>
+            </TouchableOpacity>
             <View style={s.divider} />
-            <View style={s.stat}>
-              <Text style={s.statV}>48</Text>
+            <TouchableOpacity style={s.stat} onPress={() => router.push('/saved' as any)}>
+              <Text style={s.statV}>{savedCount ?? '–'}</Text>
               <Text style={s.statL}>Saved</Text>
-            </View>
+            </TouchableOpacity>
             <View style={s.divider} />
             <View style={s.stat}>
-              <Text style={s.statV}>3</Text>
+              <Text style={s.statV}>—</Text>
               <Text style={s.statL}>Posts</Text>
             </View>
           </View>
         </View>
 
-        <Text style={s.sectionTitle}>Settings</Text>
+        <Text style={s.sectionTitle}>My BiteSwipe</Text>
 
         <View style={s.menu}>
+          <TouchableOpacity style={s.menuItem} onPress={() => router.push('/saved' as any)}>
+            <Feather name="bookmark" size={20} color={BrandColors.textSecondary} />
+            <Text style={s.menuT}>Saved Recipes</Text>
+            <Feather name="chevron-right" size={20} color={BrandColors.textTertiary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={s.menuItem} onPress={() => router.push('/preferences' as any)}>
+            <Feather name="heart" size={20} color={BrandColors.textSecondary} />
+            <Text style={s.menuT}>Dietary Preferences</Text>
+            <Feather name="chevron-right" size={20} color={BrandColors.textTertiary} />
+          </TouchableOpacity>
           <TouchableOpacity style={s.menuItem} onPress={() => {
             if (Platform.OS === 'web') window.alert('Notifications coming soon!');
             else Alert.alert('Coming Soon', 'Notification settings will be available in the next update.');
           }}>
             <Feather name="bell" size={20} color={BrandColors.textSecondary} />
             <Text style={s.menuT}>Notifications</Text>
-            <Feather name="chevron-right" size={20} color={BrandColors.textTertiary} />
-          </TouchableOpacity>
-          <TouchableOpacity style={s.menuItem} onPress={() => {
-            if (Platform.OS === 'web') window.alert('Dietary preferences coming soon!');
-            else Alert.alert('Coming Soon', 'Set allergies and dietary preferences in the next update.');
-          }}>
-            <Feather name="heart" size={20} color={BrandColors.textSecondary} />
-            <Text style={s.menuT}>Dietary Preferences</Text>
             <Feather name="chevron-right" size={20} color={BrandColors.textTertiary} />
           </TouchableOpacity>
           <TouchableOpacity style={[s.menuItem, s.menuItemLast]} onPress={() => {

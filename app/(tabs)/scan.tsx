@@ -16,6 +16,8 @@ import { useRouter } from 'expo-router';
 import GlassCard from '@/components/ui/GlassCard';
 import { BrandColors, Gradients, Radius, Spacing, Typography, Shadows } from '@/constants/theme';
 import { scanFridge, generateRecipesFromIngredients, type DietPreference, type AIRecipe } from '@/services/ai';
+import { getPrefs } from '@/services/userPrefs';
+import { getFreshPantry, mergePantry } from '@/services/pantry';
 
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
@@ -173,7 +175,19 @@ export default function ScanScreen() {
   const [ingredients, setIngredients] = useState<ScannedIngredient[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [diet, setDiet] = useState<DietPreference | null>(null);
+  const [allergens, setAllergens] = useState<string[]>([]);
   const [aiRecipes, setAIRecipes] = useState<AIRecipe[]>([]);
+  const [pantry, setPantry] = useState<string[]>([]);
+
+  // Load saved diet preference + fresh pantry on mount.
+  useEffect(() => {
+    (async () => {
+      const [prefs, fresh] = await Promise.all([getPrefs(), getFreshPantry()]);
+      if (prefs.dietPreference) setDiet(prefs.dietPreference);
+      setAllergens(prefs.allergens);
+      setPantry(fresh);
+    })();
+  }, []);
 
   // Pulse animation for the scan button
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -205,6 +219,8 @@ export default function ScanScreen() {
       setIngredients(formatted);
       setSelected(formatted.map(i => i.name));
       setMode('results');
+      // Fire-and-forget: remember these ingredients in the pantry for next time.
+      mergePantry(aiResult).catch(() => {});
     } catch (err: any) {
       console.error('[scanFridge] error:', err);
       const msg = err?.message ?? String(err);
@@ -238,11 +254,20 @@ export default function ScanScreen() {
     setMode('camera');
   };
 
+  const handleUsePantry = () => {
+    if (!requireDiet()) return;
+    if (pantry.length === 0) return;
+    const formatted = pantry.map(name => ({ name, confidence: 0.92 }));
+    setIngredients(formatted);
+    setSelected(pantry);
+    setMode('results');
+  };
+
   const handleFindRecipes = async () => {
     if (selected.length === 0 || !diet) return;
     setMode('cooking');
     try {
-      const recipes = await generateRecipesFromIngredients(selected, diet);
+      const recipes = await generateRecipesFromIngredients(selected, diet, allergens);
       if (!recipes || recipes.length === 0) {
         alert('BiteSwipe AI couldn’t cook anything up. Try different ingredients.');
         setMode('results');
@@ -391,6 +416,21 @@ export default function ScanScreen() {
 
           {mode === 'home' && (
             <View style={s.cameraBox}>
+              {pantry.length > 0 && (
+                <TouchableOpacity onPress={handleUsePantry} activeOpacity={0.85} style={s.pantryCard}>
+                  <View style={s.pantryIcon}>
+                    <Feather name="archive" size={18} color={BrandColors.primaryStart} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.pantryTitle}>Continue from your pantry</Text>
+                    <Text style={s.pantrySub} numberOfLines={1}>
+                      {pantry.length} item{pantry.length === 1 ? '' : 's'} from recent scans · {pantry.slice(0, 3).join(', ')}{pantry.length > 3 ? '…' : ''}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={18} color={BrandColors.textTertiary} />
+                </TouchableOpacity>
+              )}
+
               {/* Dietary preference picker — required before scan */}
               <View style={s.dietBlock}>
                 <Text style={s.dietLabel}>Choose your dietary preference</Text>
@@ -612,6 +652,12 @@ const s = StyleSheet.create({
   matchPct: { color: '#fff', fontSize: 13, fontWeight: '800' },
   rescanBtn: { flexDirection: 'row', backgroundColor: BrandColors.glass, borderWidth: 1, borderColor: BrandColors.glassBorder, paddingVertical: Spacing.sm, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.md },
   rescanText: { color: BrandColors.textSecondary, ...Typography.bodyBold },
+
+  // Pantry continuation card
+  pantryCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderRadius: Radius.lg, backgroundColor: BrandColors.dark800, borderWidth: 1, borderColor: BrandColors.glassBorder, marginBottom: Spacing.lg, width: '100%' },
+  pantryIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,107,53,0.12)', alignItems: 'center', justifyContent: 'center' },
+  pantryTitle: { color: BrandColors.textPrimary, ...Typography.bodyBold },
+  pantrySub: { color: BrandColors.textTertiary, ...Typography.caption, marginTop: 2 },
 
   // Dietary preference picker
   dietBlock: { width: '100%', marginBottom: Spacing.lg },
