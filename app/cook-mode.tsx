@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Speech from 'expo-speech';
 import { BrandColors, Gradients, Radius, Spacing, Typography } from '@/constants/theme';
 import { logCook } from '@/services/cookHistory';
 
@@ -28,6 +29,35 @@ export default function CookModeScreen() {
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
   const [done, setDone] = useState(false);
+  const [voiceOn, setVoiceOn] = useState(false);
+
+  // Strip bracketed alternatives like "[or paprika]" so the readout sounds natural.
+  const speakable = (text: string) => text.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+
+  // Speak the current step whenever it changes — only if voice is enabled.
+  useEffect(() => {
+    if (!voiceOn) return;
+    const text = speakable(steps[currentStep] ?? '');
+    if (!text) return;
+    Speech.stop();
+    Speech.speak(text, { rate: 0.95, pitch: 1.0 });
+    return () => { Speech.stop(); };
+  }, [currentStep, voiceOn]);
+
+  // Always stop speaking on unmount.
+  useEffect(() => () => { Speech.stop(); }, []);
+
+  const toggleVoice = () => {
+    setVoiceOn(v => {
+      const next = !v;
+      if (!next) Speech.stop();
+      else {
+        const text = speakable(steps[currentStep] ?? '');
+        if (text) Speech.speak(text, { rate: 0.95, pitch: 1.0 });
+      }
+      return next;
+    });
+  };
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -153,6 +183,17 @@ export default function CookModeScreen() {
           <View style={{ flex: 1, alignItems: 'center' }}>
             <Text style={s.headerTitle} numberOfLines={1}>{title}</Text>
           </View>
+          {/* Voice toggle */}
+          <TouchableOpacity
+            onPress={toggleVoice}
+            style={[s.timerToggle, voiceOn && s.timerToggleActive, { marginRight: 8 }]}
+          >
+            <Feather
+              name={voiceOn ? 'volume-2' : 'volume-x'}
+              size={16}
+              color={voiceOn ? '#fff' : BrandColors.textSecondary}
+            />
+          </TouchableOpacity>
           {/* Timer toggle */}
           <TouchableOpacity
             onPress={() => setTimerRunning(r => !r)}

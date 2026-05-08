@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, Gradients, Radius, Spacing, Typography } from '@/constants/theme';
 import { MOCK_RECIPES } from '@/constants/mock-data';
 import { isRecipeSaved, saveRecipe, unsaveRecipe } from '@/services/savedRecipes';
+import { addItems, missingFromPantry } from '@/services/shoppingList';
 
 export default function RecipeModal() {
   const { id } = useLocalSearchParams();
@@ -51,6 +52,17 @@ export default function RecipeModal() {
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Error', msg);
     }).finally(() => setBookmarkBusy(false));
+  };
+
+  const handleAddToShoppingList = async () => {
+    const missing = await missingFromPantry(recipe.ingredients);
+    const toAdd = missing.length > 0 ? missing : recipe.ingredients;
+    const added = await addItems(toAdd, recipe.title);
+    const msg = added > 0
+      ? `Added ${added} item${added === 1 ? '' : 's'} to your shopping list.`
+      : 'Everything in this recipe is already on your list.';
+    if (Platform.OS === 'web') window.alert(msg);
+    else Alert.alert('Shopping list', msg);
   };
 
   const handleStartCooking = () => {
@@ -116,6 +128,11 @@ export default function RecipeModal() {
             ))}
           </View>
 
+          <TouchableOpacity onPress={handleAddToShoppingList} activeOpacity={0.85} style={s.shoppingBtn}>
+            <Feather name="shopping-cart" size={16} color={BrandColors.primaryStart} style={{ marginRight: 8 }} />
+            <Text style={s.shoppingBtnT}>Add missing to shopping list</Text>
+          </TouchableOpacity>
+
           <Text style={s.sectionTitle}>Instructions</Text>
           <View style={s.stepList}>
             {recipe.steps.map((step, i) => (
@@ -170,6 +187,8 @@ const s = StyleSheet.create({
   stepNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: BrandColors.dark600, alignItems: 'center', justifyContent: 'center' },
   stepNumT: { color: BrandColors.primaryStart, fontWeight: '800' },
   stepText: { color: BrandColors.textSecondary, ...Typography.body, flex: 1, lineHeight: 22 },
+  shoppingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: Radius.full, backgroundColor: 'rgba(255,107,53,0.08)', borderWidth: 1, borderColor: 'rgba(255,107,53,0.35)', marginTop: -Spacing.md, marginBottom: Spacing.lg },
+  shoppingBtnT: { color: BrandColors.primaryStart, ...Typography.caption, fontWeight: '700' },
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: Spacing.lg, backgroundColor: BrandColors.dark900, borderTopWidth: 1, borderTopColor: BrandColors.glassBorder },
   cookBtn: { paddingVertical: Spacing.md, borderRadius: Radius.full, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   cookBtnT: { color: '#fff', ...Typography.bodyBold, fontSize: 16 },

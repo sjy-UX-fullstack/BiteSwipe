@@ -109,6 +109,7 @@ function RootLayoutNav() {
         <Stack.Screen name="saved" options={{ headerShown: false }} />
         <Stack.Screen name="preferences" options={{ headerShown: false }} />
         <Stack.Screen name="ai-recipe" options={{ headerShown: false }} />
+        <Stack.Screen name="shopping-list" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="light" />
     </ThemeProvider>

@@ -9,6 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, Gradients, Radius, Spacing, Typography } from '@/constants/theme';
 import { isRecipeSaved, saveRecipe, unsaveRecipe } from '@/services/savedRecipes';
+import { addItems, missingFromPantry } from '@/services/shoppingList';
 
 type Liked = 'yes' | 'no' | null;
 
@@ -73,6 +74,18 @@ export default function AIRecipeScreen() {
         source: 'ai',
       },
     });
+  };
+
+  const handleAddToShoppingList = async () => {
+    if (!data?.ingredients?.length) return;
+    const missing = await missingFromPantry(data.ingredients);
+    const toAdd = missing.length > 0 ? missing : data.ingredients;
+    const added = await addItems(toAdd, data.title);
+    const msg = added > 0
+      ? `Added ${added} item${added === 1 ? '' : 's'} to your shopping list.`
+      : 'Everything in this recipe is already on your list.';
+    if (Platform.OS === 'web') window.alert(msg);
+    else Alert.alert('Shopping list', msg);
   };
 
   const toggleStep = (i: number) =>
@@ -162,6 +175,11 @@ export default function AIRecipeScreen() {
             </View>
           ))}
         </View>
+
+        <TouchableOpacity onPress={handleAddToShoppingList} activeOpacity={0.85} style={s.shoppingBtn}>
+          <Feather name="shopping-cart" size={16} color={BrandColors.primaryStart} style={{ marginRight: 8 }} />
+          <Text style={s.shoppingBtnT}>Add missing to shopping list</Text>
+        </TouchableOpacity>
 
         <View style={s.stepsTitleRow}>
           <Text style={s.sectionTitle}>Instructions</Text>
@@ -310,6 +328,8 @@ const s = StyleSheet.create({
   bookmarkBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: BrandColors.glass, borderWidth: 1, borderColor: BrandColors.glassBorder, alignItems: 'center', justifyContent: 'center' },
   cookBtn: { flexDirection: 'row', paddingVertical: Spacing.md, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center' },
   cookBtnT: { color: '#fff', ...Typography.bodyBold, fontSize: 16 },
+  shoppingBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md, borderRadius: Radius.full, backgroundColor: 'rgba(255,107,53,0.08)', borderWidth: 1, borderColor: 'rgba(255,107,53,0.35)', marginTop: Spacing.xs },
+  shoppingBtnT: { color: BrandColors.primaryStart, ...Typography.caption, fontWeight: '700' },
   feedback: { marginTop: Spacing.xxl, padding: Spacing.lg, backgroundColor: BrandColors.dark800, borderRadius: Radius.lg, borderWidth: 1, borderColor: BrandColors.glassBorder },
   fbTitle: { color: BrandColors.textPrimary, ...Typography.h3, marginBottom: Spacing.md, textAlign: 'center' },
   fbSub: { color: BrandColors.textSecondary, ...Typography.caption, marginTop: Spacing.lg, marginBottom: Spacing.xs, textAlign: 'center' },

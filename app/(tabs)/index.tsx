@@ -37,6 +37,13 @@ export default function HomeScreen() {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <TouchableOpacity
+                onPress={() => router.push('/shopping-list' as any)}
+                style={styles.headerIconBtn}
+                hitSlop={8}
+              >
+                <Feather name="shopping-cart" size={18} color={BrandColors.textPrimary} />
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={() => router.push('/saved' as any)}
                 style={styles.headerIconBtn}
                 hitSlop={8}
