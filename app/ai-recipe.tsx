@@ -32,14 +32,13 @@ export default function AIRecipeScreen() {
     (async () => { setBookmarked(await isRecipeSaved(data.id)); })();
   }, [data?.id]);
 
-  const toggleBookmark = async () => {
+  const toggleBookmark = () => {
     if (!data?.id || bookmarkBusy) return;
-    setBookmarkBusy(true);
     const next = !bookmarked;
     setBookmarked(next);
-    try {
-      if (next) {
-        await saveRecipe({
+    setBookmarkBusy(true);
+    const op = next
+      ? saveRecipe({
           id: data.id,
           title: data.title,
           cuisine: data.cuisine,
@@ -52,18 +51,15 @@ export default function AIRecipeScreen() {
           tags: data.tags,
           matchPercentage: data.matchPercentage,
           source: 'ai',
-        });
-      } else {
-        await unsaveRecipe(data.id);
-      }
-    } catch (e: any) {
+        })
+      : unsaveRecipe(data.id);
+    op.catch((e: any) => {
+      console.warn('[ai-recipe save]', e);
       setBookmarked(!next);
       const msg = e?.message ?? 'Could not update saved.';
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Error', msg);
-    } finally {
-      setBookmarkBusy(false);
-    }
+    }).finally(() => setBookmarkBusy(false));
   };
 
   const startCooking = () => {

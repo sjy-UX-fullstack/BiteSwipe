@@ -24,14 +24,13 @@ export default function RecipeModal() {
     })();
   }, [recipe.id]);
 
-  const toggleBookmark = async () => {
+  const toggleBookmark = () => {
     if (bookmarkBusy) return;
-    setBookmarkBusy(true);
     const next = !bookmarked;
-    setBookmarked(next);  // optimistic
-    try {
-      if (next) {
-        await saveRecipe({
+    setBookmarked(next);          // optimistic, no await
+    setBookmarkBusy(true);
+    const op = next
+      ? saveRecipe({
           id: recipe.id,
           title: recipe.title,
           cuisine: recipe.cuisine,
@@ -43,21 +42,15 @@ export default function RecipeModal() {
           steps: recipe.steps,
           tags: recipe.tags,
           source: 'mock',
-        });
-      } else {
-        await unsaveRecipe(recipe.id);
-      }
-      const msg = next ? `"${recipe.title}" saved to your collection!` : `"${recipe.title}" removed from saved.`;
-      if (Platform.OS === 'web') window.alert(msg);
-      else Alert.alert(next ? 'Saved!' : 'Removed', msg);
-    } catch (e: any) {
-      setBookmarked(!next);  // rollback
+        })
+      : unsaveRecipe(recipe.id);
+    op.catch((e: any) => {
+      console.warn('[modal save]', e);
+      setBookmarked(!next);       // rollback on real failure
       const msg = e?.message ?? 'Could not update saved.';
       if (Platform.OS === 'web') window.alert(msg);
       else Alert.alert('Error', msg);
-    } finally {
-      setBookmarkBusy(false);
-    }
+    }).finally(() => setBookmarkBusy(false));
   };
 
   const handleStartCooking = () => {

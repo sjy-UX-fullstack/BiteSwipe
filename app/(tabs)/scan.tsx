@@ -361,6 +361,12 @@ export default function ScanScreen() {
             <Text style={s.desc}>
               Crafted by BiteSwipe AI from your {selected.length} ingredients · {diet === 'vegan' ? 'Vegan' : diet === 'veg' ? 'Vegetarian' : 'Non-Veg'}
             </Text>
+            {allergens.length > 0 && (
+              <View style={s.allergenBanner}>
+                <Feather name="alert-circle" size={14} color={BrandColors.accent} />
+                <Text style={s.allergenBannerT}>Excluding: {allergens.join(', ')}</Text>
+              </View>
+            )}
 
             {aiRecipes.map((r, idx) => (
               <TouchableOpacity
@@ -670,6 +676,8 @@ const s = StyleSheet.create({
   dietChipTActive: { color: '#fff', ...Typography.caption, fontWeight: '800' },
 
   // AI recipes view
+  allergenBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,209,102,0.08)', borderWidth: 1, borderColor: 'rgba(255,209,102,0.35)', paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: Radius.md, marginBottom: Spacing.md, alignSelf: 'flex-start' },
+  allergenBannerT: { color: BrandColors.accent, ...Typography.caption, fontWeight: '700' },
   backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: BrandColors.glass, borderWidth: 1, borderColor: BrandColors.glassBorder, alignItems: 'center', justifyContent: 'center' },
   aiCard: { padding: Spacing.md, marginBottom: Spacing.md },
   aiCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },

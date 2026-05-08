@@ -1,5 +1,8 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import {
+  getFirestore, collection, getDocs,
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+} from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { Platform } from 'react-native';
 
@@ -16,7 +19,23 @@ const firebaseConfig = {
 // Prevent re-initializing on hot reload
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-export const db = getFirestore(app);
+// On web, use Firestore's IndexedDB-backed cache so reads are instant after
+// the first round-trip. Fallback to plain getFirestore if init has already
+// happened (e.g. hot reload) since initializeFirestore can only run once.
+let dbInstance: ReturnType<typeof getFirestore>;
+if (Platform.OS === 'web') {
+  try {
+    dbInstance = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch {
+    dbInstance = getFirestore(app);
+  }
+} else {
+  dbInstance = getFirestore(app);
+}
+
+export const db = dbInstance;
 
 // On native, we use initializeAuth with AsyncStorage persistence.
 // On web, getAuth() is sufficient and uses localStorage automatically.

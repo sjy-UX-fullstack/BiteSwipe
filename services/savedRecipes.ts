@@ -4,7 +4,7 @@
  */
 import {
   collection, doc, getDoc, getDocs, setDoc, deleteDoc,
-  serverTimestamp, orderBy, query, limit,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 
@@ -34,9 +34,14 @@ function uid(): string {
 }
 
 export async function saveRecipe(recipe: SavedRecipe): Promise<void> {
+  // Firestore rejects undefined values — strip them.
+  const clean: Record<string, any> = {};
+  for (const [k, v] of Object.entries(recipe)) {
+    if (v !== undefined) clean[k] = v;
+  }
   await setDoc(
     doc(db, 'users', uid(), 'saved', recipe.id),
-    { ...recipe, savedAt: serverTimestamp() },
+    { ...clean, savedAt: serverTimestamp() },
     { merge: true },
   );
 }
@@ -56,13 +61,15 @@ export async function isRecipeSaved(recipeId: string): Promise<boolean> {
 
 export async function listSavedRecipes(max = 100): Promise<SavedRecipe[]> {
   try {
-    const q = query(
-      collection(db, 'users', uid(), 'saved'),
-      orderBy('savedAt', 'desc'),
-      limit(max),
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ ...(d.data() as SavedRecipe), id: d.id }));
+    const snap = await getDocs(collection(db, 'users', uid(), 'saved'));
+    const recipes = snap.docs.map(d => ({ ...(d.data() as SavedRecipe), id: d.id }));
+    // Sort newest-first client-side; tolerate missing savedAt on old docs.
+    recipes.sort((a, b) => {
+      const at = a.savedAt?.toMillis?.() ?? 0;
+      const bt = b.savedAt?.toMillis?.() ?? 0;
+      return bt - at;
+    });
+    return recipes.slice(0, max);
   } catch (e) {
     console.warn('[listSavedRecipes]', e);
     return [];

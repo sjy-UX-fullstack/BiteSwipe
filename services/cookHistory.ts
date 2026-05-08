@@ -4,7 +4,7 @@
  */
 import {
   collection, addDoc, getDocs, getCountFromServer,
-  serverTimestamp, orderBy, query, limit,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 
@@ -38,13 +38,14 @@ export async function listCookHistory(max = 50): Promise<CookEntry[]> {
   const u = uid();
   if (!u) return [];
   try {
-    const q = query(
-      collection(db, 'users', u, 'cookHistory'),
-      orderBy('cookedAt', 'desc'),
-      limit(max),
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ ...(d.data() as CookEntry), id: d.id }));
+    const snap = await getDocs(collection(db, 'users', u, 'cookHistory'));
+    const entries = snap.docs.map(d => ({ ...(d.data() as CookEntry), id: d.id }));
+    entries.sort((a: any, b: any) => {
+      const at = a.cookedAt?.toMillis?.() ?? 0;
+      const bt = b.cookedAt?.toMillis?.() ?? 0;
+      return bt - at;
+    });
+    return entries.slice(0, max);
   } catch (e) {
     console.warn('[listCookHistory]', e);
     return [];
