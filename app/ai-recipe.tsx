@@ -22,6 +22,17 @@ export default function AIRecipeScreen() {
   const [liked, setLiked] = useState<Liked>(null);
   const [stars, setStars] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set());
+
+  const toggleStep = (i: number) =>
+    setCheckedSteps(prev => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+
+  const totalSteps: number = (data?.steps ?? []).length;
+  const doneCount = checkedSteps.size;
 
   if (!data) {
     return (
@@ -94,15 +105,50 @@ export default function AIRecipeScreen() {
           ))}
         </View>
 
-        <Text style={s.sectionTitle}>Instructions</Text>
-        <View style={s.stepList}>
-          {(data.steps ?? []).map((step: string, i: number) => (
-            <View key={i} style={s.stepItem}>
-              <View style={s.stepNum}><Text style={s.stepNumT}>{i + 1}</Text></View>
-              <Text style={s.stepText}>{step}</Text>
+        <View style={s.stepsTitleRow}>
+          <Text style={s.sectionTitle}>Instructions</Text>
+          {totalSteps > 0 && (
+            <View style={s.progressPill}>
+              {doneCount === totalSteps
+                ? <Feather name="check-circle" size={13} color={BrandColors.success} />
+                : <Text style={s.progressPillT}>{doneCount}/{totalSteps}</Text>}
             </View>
-          ))}
+          )}
         </View>
+
+        {totalSteps > 0 && (
+          <View style={s.progressBar}>
+            <View style={[s.progressFill, { width: `${(doneCount / totalSteps) * 100}%` as any }]} />
+          </View>
+        )}
+
+        <View style={s.stepList}>
+          {(data.steps ?? []).map((step: string, i: number) => {
+            const done = checkedSteps.has(i);
+            return (
+              <TouchableOpacity
+                key={i}
+                onPress={() => toggleStep(i)}
+                activeOpacity={0.75}
+                style={[s.stepItem, done && s.stepItemDone]}
+              >
+                <View style={[s.stepCheck, done && s.stepCheckDone]}>
+                  {done
+                    ? <Feather name="check" size={14} color="#fff" />
+                    : <Text style={s.stepNumT}>{i + 1}</Text>}
+                </View>
+                <Text style={[s.stepText, done && s.stepTextDone]}>{step}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {doneCount === totalSteps && totalSteps > 0 && (
+          <View style={s.allDoneBanner}>
+            <Feather name="check-circle" size={18} color={BrandColors.success} />
+            <Text style={s.allDoneT}>All steps done — enjoy your meal!</Text>
+          </View>
+        )}
 
         {/* Feedback widget */}
         <View style={s.feedback}>
@@ -179,11 +225,21 @@ const s = StyleSheet.create({
   list: { gap: Spacing.sm },
   ingItem: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   ingText: { color: BrandColors.textSecondary, ...Typography.body, flex: 1 },
-  stepList: { gap: Spacing.lg },
-  stepItem: { flexDirection: 'row', gap: Spacing.md },
-  stepNum: { width: 28, height: 28, borderRadius: 14, backgroundColor: BrandColors.dark600, alignItems: 'center', justifyContent: 'center' },
-  stepNumT: { color: BrandColors.primaryStart, fontWeight: '800' },
+  stepsTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.lg },
+  progressPill: { backgroundColor: BrandColors.dark600, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full },
+  progressPillT: { color: BrandColors.textTertiary, fontSize: 11, fontWeight: '700' },
+  progressBar: { height: 4, backgroundColor: BrandColors.dark600, borderRadius: 2, marginBottom: Spacing.md, marginTop: 4 },
+  progressFill: { height: 4, backgroundColor: BrandColors.success, borderRadius: 2 },
+  stepList: { gap: Spacing.md },
+  stepItem: { flexDirection: 'row', gap: Spacing.md, padding: Spacing.sm, borderRadius: Radius.md, backgroundColor: BrandColors.dark800, borderWidth: 1, borderColor: BrandColors.glassBorder },
+  stepItemDone: { opacity: 0.45 },
+  stepCheck: { width: 28, height: 28, borderRadius: 14, backgroundColor: BrandColors.dark600, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  stepCheckDone: { backgroundColor: BrandColors.success },
+  stepNumT: { color: BrandColors.primaryStart, fontWeight: '800', fontSize: 13 },
   stepText: { color: BrandColors.textSecondary, ...Typography.body, flex: 1, lineHeight: 22 },
+  stepTextDone: { textDecorationLine: 'line-through', color: BrandColors.textTertiary },
+  allDoneBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(52,199,89,0.12)', borderWidth: 1, borderColor: BrandColors.success, borderRadius: Radius.md, padding: Spacing.md, marginTop: Spacing.md },
+  allDoneT: { color: BrandColors.success, ...Typography.bodyBold },
   feedback: { marginTop: Spacing.xxl, padding: Spacing.lg, backgroundColor: BrandColors.dark800, borderRadius: Radius.lg, borderWidth: 1, borderColor: BrandColors.glassBorder },
   fbTitle: { color: BrandColors.textPrimary, ...Typography.h3, marginBottom: Spacing.md, textAlign: 'center' },
   fbSub: { color: BrandColors.textSecondary, ...Typography.caption, marginTop: Spacing.lg, marginBottom: Spacing.xs, textAlign: 'center' },

@@ -10,31 +10,24 @@ function buildPrompt(ingredients: string[], diet: string) {
     diet === 'vegan'
       ? 'STRICTLY VEGAN: no meat, fish, eggs, dairy, honey, ghee, butter, paneer, yogurt.'
       : diet === 'veg'
-      ? 'STRICTLY VEGETARIAN: no meat, fish, or seafood. Dairy and eggs allowed.'
-      : 'NON-VEGETARIAN allowed: meat, fish, eggs, and dairy are all fine.';
+      ? 'STRICTLY VEGETARIAN: no meat, fish, seafood. Dairy and eggs OK.'
+      : 'NON-VEGETARIAN: meat, fish, eggs, dairy all fine.';
 
-  return `You are BiteSwipe AI, a creative chef.
-Available ingredients: ${ingredients.join(', ')}
-Dietary rule: ${dietRule}
+  return `You are BiteSwipe AI, a precise home chef.
+Available: ${ingredients.join(', ')}
+Diet: ${dietRule}
+Always include these pantry basics in every recipe: salt, oil (any), and 2-3 relevant spices from [cumin/caraway, turmeric/paprika, coriander/oregano, garam masala/Italian seasoning, chili/pepper, garlic powder/fresh garlic].
 
-Generate 6 delicious recipes that primarily use the available ingredients (you may add common pantry items like salt, oil, spices, water).
-Return ONLY a valid JSON array of 6 objects. No prose, no markdown fences. Format:
-[
-  {
-    "id": "ai_1",
-    "title": "Recipe name",
-    "cuisine": "Indian/Italian/Mexican/etc",
-    "cookTime": "25 min",
-    "difficulty": "Easy",
-    "calories": 420,
-    "servings": 2,
-    "tags": ["Quick","Healthy"],
-    "ingredients": ["1 cup rice","2 eggs","..."],
-    "steps": ["step 1","step 2","..."],
-    "matchPercentage": 88
-  }
-]
-Sort by best match first. matchPercentage = how much the recipe leans on the available ingredients (0-100).`;
+Generate 5 recipes using the available ingredients. Return ONLY a valid JSON array of 5 objects, no prose:
+[{"id":"ai_1","title":"","cuisine":"","cookTime":"","difficulty":"Easy/Medium/Hard","calories":0,"servings":2,"tags":[""],"ingredients":["qty + item"],"steps":["..."],"matchPercentage":0}]
+
+Rules for steps (IMPORTANT):
+- 5-7 steps per recipe, each step is 2-3 short sentences max
+- Always include: heat level (low/medium/high), duration ("3-4 min"), and a visual cue ("until golden", "until fragrant")
+- Where spices vary, write the alternative in brackets: "1 tsp cumin [or caraway]", "½ tsp turmeric [or paprika]"
+- Example step: "Heat 2 tbsp oil in a pan on medium-high. Add onion and cook 4-5 min until translucent and edges turn golden."
+
+Sort by matchPercentage desc.`;
 }
 
 export default async function handler(req: any, res: any) {
@@ -62,8 +55,8 @@ export default async function handler(req: any, res: any) {
     messages: [
       { role: 'user', content: buildPrompt(ingredients, diet) },
     ],
-    temperature: 0.6,
-    max_tokens: 2400,
+    temperature: 0.5,
+    max_tokens: 2800,
   };
 
   try {
