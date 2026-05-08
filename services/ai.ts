@@ -50,6 +50,49 @@ Example: ["eggs", "milk", "tomatoes"]`;
   return [];
 };
 
+export type DietPreference = 'veg' | 'non-veg' | 'vegan';
+
+export interface AIRecipe {
+  id: string;
+  title: string;
+  cuisine: string;
+  cookTime: string;
+  difficulty: string;
+  calories: number;
+  servings: number;
+  tags: string[];
+  ingredients: string[];
+  steps: string[];
+  matchPercentage: number;
+}
+
+/**
+ * Generates recipes from a list of ingredients honoring dietary preference.
+ * Always proxied through /api/recipes (works on web; native fetches the same endpoint
+ * via absolute URL once deployed). Falls back gracefully if the host is unreachable.
+ */
+export const generateRecipesFromIngredients = async (
+  ingredients: string[],
+  diet: DietPreference,
+): Promise<AIRecipe[]> => {
+  const url = Platform.OS === 'web'
+    ? '/api/recipes'
+    : 'https://biteswipe-five.vercel.app/api/recipes';
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ingredients, diet }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const detail = body.details ? ` — ${body.details}` : '';
+    throw new Error((body.error ?? `Server error ${res.status}`) + detail);
+  }
+  const data = await res.json();
+  return data.recipes ?? [];
+};
+
 /**
  * Asks Gemini to generate a full recipe from a title or URL text.
  * NOTE: Gemini cannot browse URLs — pass text/title only.

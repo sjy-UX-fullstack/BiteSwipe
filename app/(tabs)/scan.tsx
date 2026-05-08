@@ -15,8 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import GlassCard from '@/components/ui/GlassCard';
 import { BrandColors, Gradients, Radius, Spacing, Typography, Shadows } from '@/constants/theme';
-import { MOCK_RECIPES } from '@/constants/mock-data';
-import { scanFridge } from '@/services/ai';
+import { scanFridge, generateRecipesFromIngredients, type DietPreference, type AIRecipe } from '@/services/ai';
 
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
@@ -27,13 +26,11 @@ interface ScannedIngredient {
   confidence: number;
 }
 
-function scoreRecipe(recipeIngredients: string[], selected: string[]): number {
-  const norm = selected.map(s => s.toLowerCase());
-  const matches = recipeIngredients.filter(ri =>
-    norm.some(sel => ri.toLowerCase().includes(sel) || sel.includes(ri.toLowerCase().split(' ')[0]))
-  );
-  return Math.round((matches.length / recipeIngredients.length) * 100);
-}
+const DIET_OPTIONS: { value: DietPreference; label: string; icon: any }[] = [
+  { value: 'veg', label: 'Vegetarian', icon: 'feather' },
+  { value: 'non-veg', label: 'Non-Veg', icon: 'award' },
+  { value: 'vegan', label: 'Vegan', icon: 'sun' },
+];
 
 // ─── Camera Scanner View (native only) ───────────────────────────
 function CameraScanner({ onCapture, onClose }: { onCapture: (base64: string) => void; onClose: () => void }) {
@@ -172,9 +169,11 @@ function CameraScanner({ onCapture, onClose }: { onCapture: (base64: string) => 
 // ─── Main Scan Screen ─────────────────────────────────────────────
 export default function ScanScreen() {
   const router = useRouter();
-  const [mode, setMode] = useState<'home' | 'camera' | 'analysing' | 'results'>('home');
+  const [mode, setMode] = useState<'home' | 'camera' | 'analysing' | 'results' | 'cooking' | 'recipes'>('home');
   const [ingredients, setIngredients] = useState<ScannedIngredient[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
+  const [diet, setDiet] = useState<DietPreference | null>(null);
+  const [aiRecipes, setAIRecipes] = useState<AIRecipe[]>([]);
 
   // Pulse animation for the scan button
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -214,8 +213,17 @@ export default function ScanScreen() {
     }
   };
 
+  const requireDiet = () => {
+    if (!diet) {
+      alert('Please pick your dietary preference (Veg / Non-Veg / Vegan) first.');
+      return false;
+    }
+    return true;
+  };
+
   // Web fallback — no camera API in browser
   const handleWebPick = async () => {
+    if (!requireDiet()) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { alert('Photo library permission required.'); return; }
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.4, base64: true });
@@ -225,20 +233,29 @@ export default function ScanScreen() {
     }
   };
 
-  const handleFindRecipes = () => {
-    const ids = MOCK_RECIPES
-      .map(r => ({ ...r, score: scoreRecipe(r.ingredients, selected) }))
-      .filter(r => r.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .map(r => r.id)
-      .join(',');
-    router.push({ pathname: '/see-all', params: { ids, title: 'Fridge Matches' } });
+  const handleOpenCamera = () => {
+    if (!requireDiet()) return;
+    setMode('camera');
   };
 
-  const matchedRecipes = MOCK_RECIPES
-    .map(r => ({ ...r, matchPercentage: selected.length > 0 ? scoreRecipe(r.ingredients, selected) : (r.matchPercentage ?? 0) }))
-    .sort((a, b) => (b.matchPercentage ?? 0) - (a.matchPercentage ?? 0))
-    .slice(0, 3);
+  const handleFindRecipes = async () => {
+    if (selected.length === 0 || !diet) return;
+    setMode('cooking');
+    try {
+      const recipes = await generateRecipesFromIngredients(selected, diet);
+      if (!recipes || recipes.length === 0) {
+        alert('BiteSwipe AI couldn’t cook anything up. Try different ingredients.');
+        setMode('results');
+        return;
+      }
+      setAIRecipes(recipes);
+      setMode('recipes');
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      alert(`Couldn’t generate recipes: ${msg.slice(0, 300)}`);
+      setMode('results');
+    }
+  };
 
   // ── Camera view (full screen, all platforms) ──
   if (mode === 'camera') {
@@ -250,7 +267,7 @@ export default function ScanScreen() {
     );
   }
 
-  // ── Analysing overlay ──
+  // ── Analysing overlay (scanning fridge) ──
   if (mode === 'analysing') {
     return (
       <View style={s.screen}>
@@ -258,14 +275,14 @@ export default function ScanScreen() {
           <LinearGradient colors={['rgba(255,107,53,0.12)', 'rgba(255,45,135,0.08)', 'transparent']} style={StyleSheet.absoluteFill} />
           <View style={s.analysingIcon}>
             <LinearGradient colors={Gradients.primary as [string, string]} style={s.analysingIconGrad}>
-              <Feather name="cpu" size={36} color="#fff" />
+              <Feather name="zap" size={36} color="#fff" />
             </LinearGradient>
           </View>
           <ActivityIndicator size="large" color={BrandColors.primaryStart} style={{ marginBottom: Spacing.lg }} />
-          <Text style={s.analysingTitle}>Gemini AI is scanning…</Text>
-          <Text style={s.analysingDesc}>Identifying all ingredients in your fridge</Text>
+          <Text style={s.analysingTitle}>BiteSwipe AI is reading your fridge…</Text>
+          <Text style={s.analysingDesc}>Spotting every edible bite for your next craving</Text>
           <View style={s.analysingSteps}>
-            {['Detecting food items', 'Classifying ingredients', 'Matching recipes'].map((step, i) => (
+            {['Detecting food items', 'Classifying ingredients', 'Preparing your shortlist'].map((step, i) => (
               <View key={i} style={s.analysingStep}>
                 <Feather name="check" size={14} color={BrandColors.success} style={{ marginRight: 8 }} />
                 <Text style={s.analysingStepT}>{step}</Text>
@@ -273,6 +290,87 @@ export default function ScanScreen() {
             ))}
           </View>
         </View>
+      </View>
+    );
+  }
+
+  // ── Cooking overlay (generating recipes) ──
+  if (mode === 'cooking') {
+    return (
+      <View style={s.screen}>
+        <View style={s.analysingContainer}>
+          <LinearGradient colors={['rgba(255,107,53,0.12)', 'rgba(255,45,135,0.08)', 'transparent']} style={StyleSheet.absoluteFill} />
+          <View style={s.analysingIcon}>
+            <LinearGradient colors={Gradients.primary as [string, string]} style={s.analysingIconGrad}>
+              <Feather name="zap" size={36} color="#fff" />
+            </LinearGradient>
+          </View>
+          <ActivityIndicator size="large" color={BrandColors.primaryStart} style={{ marginBottom: Spacing.lg }} />
+          <Text style={s.analysingTitle}>BiteSwipe AI is preparing your cravings…</Text>
+          <Text style={s.analysingDesc}>Whipping up {diet === 'vegan' ? 'vegan' : diet === 'veg' ? 'vegetarian' : 'non-veg'} recipes from your {selected.length} ingredients</Text>
+          <View style={s.analysingSteps}>
+            {['Picking flavor combos', 'Balancing nutrition', 'Plating it up'].map((step, i) => (
+              <View key={i} style={s.analysingStep}>
+                <Feather name="check" size={14} color={BrandColors.success} style={{ marginRight: 8 }} />
+                <Text style={s.analysingStepT}>{step}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // ── AI-generated recipes view ──
+  if (mode === 'recipes') {
+    return (
+      <View style={s.screen}>
+        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
+            <View style={s.titleRow}>
+              <TouchableOpacity onPress={() => setMode('results')} style={s.backBtn}>
+                <Feather name="arrow-left" size={20} color={BrandColors.textPrimary} />
+              </TouchableOpacity>
+              <Text style={[s.title, { flex: 1 }]}>Your AI Recipes</Text>
+            </View>
+            <Text style={s.desc}>
+              Crafted by BiteSwipe AI from your {selected.length} ingredients · {diet === 'vegan' ? 'Vegan' : diet === 'veg' ? 'Vegetarian' : 'Non-Veg'}
+            </Text>
+
+            {aiRecipes.map((r, idx) => (
+              <TouchableOpacity
+                key={r.id ?? idx}
+                activeOpacity={0.85}
+                onPress={() => router.push({ pathname: '/ai-recipe' as any, params: { recipe: JSON.stringify(r) } })}
+              >
+                <GlassCard style={s.aiCard}>
+                  <View style={s.aiCardHeader}>
+                    <Text style={s.aiCardTitle} numberOfLines={2}>{r.title}</Text>
+                    <LinearGradient colors={Gradients.primary as [string, string]} style={s.matchBadge}>
+                      <Text style={s.matchPct}>{r.matchPercentage ?? 0}%</Text>
+                    </LinearGradient>
+                  </View>
+                  <Text style={s.aiCardMeta}>{r.cuisine} · {r.cookTime} · {r.calories} cal · {r.difficulty}</Text>
+                  {Array.isArray(r.tags) && r.tags.length > 0 && (
+                    <View style={s.aiTagRow}>
+                      {r.tags.slice(0, 3).map((t, i) => (
+                        <View key={i} style={s.aiTag}><Text style={s.aiTagT}>{t}</Text></View>
+                      ))}
+                    </View>
+                  )}
+                  <Text style={s.aiCardCta}>View recipe →</Text>
+                </GlassCard>
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity onPress={() => setMode('results')} style={{ marginTop: Spacing.lg, marginBottom: Spacing.xl }}>
+              <View style={s.rescanBtn}>
+                <Feather name="refresh-ccw" size={16} color={BrandColors.textSecondary} style={{ marginRight: 8 }} />
+                <Text style={s.rescanText}>Tweak ingredients</Text>
+              </View>
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
       </View>
     );
   }
@@ -293,6 +391,37 @@ export default function ScanScreen() {
 
           {mode === 'home' && (
             <View style={s.cameraBox}>
+              {/* Dietary preference picker — required before scan */}
+              <View style={s.dietBlock}>
+                <Text style={s.dietLabel}>Choose your dietary preference</Text>
+                <Text style={s.dietHint}>Required — BiteSwipe AI tailors recipes to it</Text>
+                <View style={s.dietRow}>
+                  {DIET_OPTIONS.map(opt => {
+                    const active = diet === opt.value;
+                    return (
+                      <TouchableOpacity
+                        key={opt.value}
+                        onPress={() => setDiet(opt.value)}
+                        activeOpacity={0.8}
+                        style={{ flex: 1 }}
+                      >
+                        {active ? (
+                          <LinearGradient colors={Gradients.primary as [string, string]} style={s.dietChipActive}>
+                            <Feather name={opt.icon} size={16} color="#fff" />
+                            <Text style={s.dietChipTActive}>{opt.label}</Text>
+                          </LinearGradient>
+                        ) : (
+                          <View style={s.dietChip}>
+                            <Feather name={opt.icon} size={16} color={BrandColors.textSecondary} />
+                            <Text style={s.dietChipT}>{opt.label}</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
               {/* Live viewfinder mockup */}
               <View style={s.viewfinder}>
                 <LinearGradient colors={['rgba(255,107,53,0.06)', 'rgba(255,45,135,0.06)']} style={StyleSheet.absoluteFill} />
@@ -308,8 +437,8 @@ export default function ScanScreen() {
               </View>
 
               {/* Scan button with pulse */}
-              <Animated.View style={{ transform: [{ scale: pulseAnim }], marginTop: Spacing.xl }}>
-                <TouchableOpacity onPress={() => setMode('camera')} activeOpacity={0.85}>
+              <Animated.View style={{ transform: [{ scale: pulseAnim }], marginTop: Spacing.xl, opacity: diet ? 1 : 0.5 }}>
+                <TouchableOpacity onPress={handleOpenCamera} activeOpacity={0.85}>
                   <LinearGradient
                     colors={Gradients.primary as [string, string]}
                     start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
@@ -374,39 +503,13 @@ export default function ScanScreen() {
               {selected.length > 0 && (
                 <TouchableOpacity onPress={handleFindRecipes} activeOpacity={0.85} style={{ marginTop: Spacing.lg }}>
                   <LinearGradient colors={Gradients.primary as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.scanBtn, Shadows.glow]}>
-                    <Feather name="search" size={20} color="#fff" style={{ marginRight: 8 }} />
-                    <Text style={s.scanBtnText}>Find Recipes ({selected.length} ingredients)</Text>
+                    <Feather name="zap" size={20} color="#fff" style={{ marginRight: 8 }} />
+                    <Text style={s.scanBtnText}>Cook with BiteSwipe AI ({selected.length})</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               )}
 
-              {/* Best matches */}
-              <View style={s.section}>
-                <View style={s.secTitleRow}>
-                  <Feather name="award" size={20} color={BrandColors.accent} />
-                  <Text style={s.secTitle}>Best Matches</Text>
-                </View>
-                {matchedRecipes.map(r => (
-                  <TouchableOpacity key={r.id} activeOpacity={0.8} onPress={() => router.push({ pathname: '/modal', params: { id: r.id } })}>
-                    <GlassCard style={s.matchCard}>
-                      <View style={s.matchRow}>
-                        <View style={s.matchIconBg}>
-                          <Feather name={r.icon as any} size={22} color={BrandColors.textPrimary} />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={s.matchName}>{r.title}</Text>
-                          <Text style={s.matchMeta}>{r.cookTime} · {r.calories} cal</Text>
-                        </View>
-                        <LinearGradient colors={Gradients.primary as [string, string]} style={s.matchBadge}>
-                          <Text style={s.matchPct}>{r.matchPercentage ?? 0}%</Text>
-                        </LinearGradient>
-                      </View>
-                    </GlassCard>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TouchableOpacity onPress={() => { setMode('home'); setIngredients([]); setSelected([]); }} style={{ marginBottom: Spacing.xl }}>
+              <TouchableOpacity onPress={() => { setMode('home'); setIngredients([]); setSelected([]); setAIRecipes([]); }} style={{ marginBottom: Spacing.xl, marginTop: Spacing.lg }}>
                 <View style={s.rescanBtn}>
                   <Feather name="refresh-ccw" size={16} color={BrandColors.textSecondary} style={{ marginRight: 8 }} />
                   <Text style={s.rescanText}>Scan Again</Text>
@@ -509,4 +612,25 @@ const s = StyleSheet.create({
   matchPct: { color: '#fff', fontSize: 13, fontWeight: '800' },
   rescanBtn: { flexDirection: 'row', backgroundColor: BrandColors.glass, borderWidth: 1, borderColor: BrandColors.glassBorder, paddingVertical: Spacing.sm, borderRadius: Radius.full, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.md },
   rescanText: { color: BrandColors.textSecondary, ...Typography.bodyBold },
+
+  // Dietary preference picker
+  dietBlock: { width: '100%', marginBottom: Spacing.lg },
+  dietLabel: { color: BrandColors.textPrimary, ...Typography.bodyBold, marginBottom: 2 },
+  dietHint: { color: BrandColors.textTertiary, ...Typography.caption, marginBottom: Spacing.sm },
+  dietRow: { flexDirection: 'row', gap: Spacing.sm },
+  dietChip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.sm, borderRadius: Radius.full, backgroundColor: BrandColors.glass, borderWidth: 1, borderColor: BrandColors.glassBorder },
+  dietChipT: { color: BrandColors.textSecondary, ...Typography.caption, fontWeight: '700' },
+  dietChipActive: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.sm, borderRadius: Radius.full },
+  dietChipTActive: { color: '#fff', ...Typography.caption, fontWeight: '800' },
+
+  // AI recipes view
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: BrandColors.glass, borderWidth: 1, borderColor: BrandColors.glassBorder, alignItems: 'center', justifyContent: 'center' },
+  aiCard: { padding: Spacing.md, marginBottom: Spacing.md },
+  aiCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  aiCardTitle: { flex: 1, color: BrandColors.textPrimary, ...Typography.bodyBold, fontSize: 16 },
+  aiCardMeta: { color: BrandColors.textTertiary, ...Typography.caption, marginTop: 4 },
+  aiTagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Spacing.sm },
+  aiTag: { backgroundColor: BrandColors.dark600, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.full },
+  aiTagT: { color: BrandColors.textSecondary, fontSize: 10, fontWeight: '700' },
+  aiCardCta: { color: BrandColors.primaryStart, ...Typography.caption, fontWeight: '700', marginTop: Spacing.sm },
 });
