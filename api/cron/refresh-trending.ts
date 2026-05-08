@@ -192,12 +192,16 @@ export default async function handler(req: any, res: any) {
 
   const ytKey = process.env.YT_API_KEY;
   const groqKey = process.env.GROQ_API_KEY;
-  if (!ytKey) return res.status(500).json({ error: 'YT_API_KEY not set' });
+  if (!ytKey) {
+    console.error('[refresh-trending] YT_API_KEY not set');
+    return res.status(500).json({ error: 'YT_API_KEY not set' });
+  }
 
   let db: admin.firestore.Firestore;
   try {
     db = getDb();
   } catch (e: any) {
+    console.error('[refresh-trending] Firebase init failed:', e?.message, e?.stack);
     return res.status(500).json({ error: e?.message ?? 'Firebase init failed' });
   }
 
