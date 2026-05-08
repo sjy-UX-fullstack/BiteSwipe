@@ -12,6 +12,7 @@ import { BrandColors, Gradients, Radius, Spacing, Typography, Shadows } from '@/
 import { MOCK_TRENDING, TrendingItem } from '@/constants/mock-data';
 import { parseRecipeText } from '@/services/ai';
 import { getViralRecipes } from '@/services/viralRecipes';
+import { listTrending, formatViews, type TrendingRecipe } from '@/services/trending';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTAINER_WIDTH = Math.min(SCREEN_WIDTH, 428);
@@ -23,22 +24,41 @@ export default function TrendingScreen() {
   const [url, setUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [viralItems, setViralItems] = useState<TrendingItem[]>([]);
+  const [liveItems, setLiveItems] = useState<TrendingRecipe[]>([]);
   const [loadingViral, setLoadingViral] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const items = await getViralRecipes();
-        setViralItems(items);
+        // Live YouTube/Instagram items from the weekly cron (preferred).
+        const live = await listTrending();
+        setLiveItems(live);
+
+        // Gemini-curated fallback (still useful when cron hasn't run yet).
+        if (live.length < 6) {
+          const items = await getViralRecipes();
+          setViralItems(items);
+        }
       } catch {
-        // fallback to mock only
+        // ignore — we'll just show MOCK_TRENDING
       } finally {
         setLoadingViral(false);
       }
     })();
   }, []);
 
-  const allItems = [...viralItems, ...MOCK_TRENDING];
+  // Adapt live Firestore items to the TrendingItem shape used by the existing UI.
+  const liveAsTrendingItems: TrendingItem[] = liveItems.map(l => ({
+    id: l.id,
+    title: l.title,
+    source: l.source,
+    creator: l.creator || l.channel || '',
+    views: formatViews(l.viewCount) || '',
+    image: l.thumbnail || '',
+    icon: l.source === 'youtube' ? 'youtube' : 'instagram',
+  }) as TrendingItem);
+
+  const allItems = [...liveAsTrendingItems, ...viralItems, ...MOCK_TRENDING];
   const filtered = filter === 'all' ? allItems : allItems.filter(t => t.source === filter);
   const hero = filtered[0];
   const grid = filtered.slice(1);
@@ -89,6 +109,30 @@ export default function TrendingScreen() {
   };
 
   const openTrendingItem = (item: TrendingItem) => {
+    // Match live Firestore-backed items first — they carry an embed URL.
+    const live = liveItems.find(l => l.id === item.id);
+    if (live) {
+      router.push({
+        pathname: '/trending-recipe',
+        params: {
+          title: live.title,
+          ingredients: JSON.stringify(live.ingredients || []),
+          steps: JSON.stringify(live.steps || []),
+          cookTime: live.cookTime || '25 min',
+          calories: String(live.calories || 0),
+          difficulty: live.difficulty || 'Medium',
+          cuisine: live.cuisine || 'Trending',
+          source: `${live.source} · ${live.creator || live.channel || ''}`,
+          views: formatViews(live.viewCount) || '',
+          embedUrl: live.embedUrl || '',
+          originalUrl: live.originalUrl || '',
+          videoSource: live.source,
+          thumbnail: live.thumbnail || '',
+        },
+      });
+      return;
+    }
+
     if ((item as any).ingredients) {
       // It's a full viral recipe from Gemini
       router.push({
@@ -204,14 +248,20 @@ export default function TrendingScreen() {
             ))}
           </ScrollView>
 
-          {/* Weekly viral label */}
-          {viralItems.length > 0 && (
+          {/* Weekly trending label */}
+          {(liveItems.length > 0 || viralItems.length > 0) && (
             <View style={s.weeklyBadgeRow}>
               <LinearGradient colors={Gradients.primary as [string, string]} style={s.weeklyBadge}>
                 <Feather name="zap" size={12} color="#fff" style={{ marginRight: 4 }} />
-                <Text style={s.weeklyBadgeT}>AI-Curated This Week</Text>
+                <Text style={s.weeklyBadgeT}>
+                  {liveItems.length > 0 ? 'Trending This Week' : 'AI-Curated This Week'}
+                </Text>
               </LinearGradient>
-              <Text style={s.weeklyHint}>Updated weekly via Gemini AI</Text>
+              <Text style={s.weeklyHint}>
+                {liveItems.length > 0
+                  ? `Refreshed weekly from YouTube + Instagram`
+                  : 'Curated by BiteSwipe AI'}
+              </Text>
             </View>
           )}
 

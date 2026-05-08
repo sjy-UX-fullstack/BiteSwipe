@@ -7,6 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, Gradients, Radius, Spacing, Typography } from '@/constants/theme';
+import VideoEmbed from '@/components/ui/VideoEmbed';
 
 export default function TrendingRecipeScreen() {
   const router = useRouter();
@@ -20,10 +21,15 @@ export default function TrendingRecipeScreen() {
     cuisine: string;
     source: string;
     views?: string;
+    embedUrl?: string;
+    originalUrl?: string;
+    videoSource?: string;
+    thumbnail?: string;
   }>();
 
   const ingredients: string[] = JSON.parse(params.ingredients || '[]');
   const steps: string[] = JSON.parse(params.steps || '[]');
+  const hasEmbed = !!params.embedUrl || !!params.originalUrl;
 
   return (
     <View style={s.screen}>
@@ -45,6 +51,18 @@ export default function TrendingRecipeScreen() {
           <Text style={s.cuisine}>{params.cuisine} · {params.difficulty}</Text>
         </LinearGradient>
 
+        {hasEmbed && (
+          <View style={s.embedWrap}>
+            <VideoEmbed
+              source={(params.videoSource as 'youtube' | 'instagram') || 'youtube'}
+              embedUrl={params.embedUrl}
+              originalUrl={params.originalUrl}
+              thumbnail={params.thumbnail}
+              title={params.title}
+            />
+          </View>
+        )}
+
         {/* Stats */}
         <View style={s.stats}>
           <View style={s.stat}>
@@ -61,10 +79,10 @@ export default function TrendingRecipeScreen() {
           </View>
         </View>
 
-        {/* AI generated label */}
+        {/* AI-extracted label */}
         <View style={s.aiBanner}>
-          <Feather name="cpu" size={14} color={BrandColors.accent} style={{ marginRight: 6 }} />
-          <Text style={s.aiText}>Recipe extracted by Gemini AI</Text>
+          <Feather name="zap" size={14} color={BrandColors.accent} style={{ marginRight: 6 }} />
+          <Text style={s.aiText}>Recipe extracted by BiteSwipe AI</Text>
         </View>
 
         {/* Ingredients */}
@@ -105,6 +123,7 @@ export default function TrendingRecipeScreen() {
               params: {
                 title: params.title,
                 steps: params.steps,
+                source: 'trending',
               },
             })
           }
@@ -148,4 +167,5 @@ const s = StyleSheet.create({
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: Spacing.lg, backgroundColor: BrandColors.dark900, borderTopWidth: 1, borderTopColor: BrandColors.glassBorder },
   cookBtn: { paddingVertical: Spacing.md, borderRadius: Radius.full, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' },
   cookBtnT: { color: '#fff', ...Typography.bodyBold, fontSize: 16 },
+  embedWrap: { paddingHorizontal: Spacing.lg, marginBottom: Spacing.md },
 });

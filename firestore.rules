@@ -22,5 +22,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if false;
     }
+
+    // Admin-curated Instagram reel URLs (managed in Firebase Console).
+    // Server cron reads these via service account; clients should not.
+    match /curated_instagram/{id} {
+      allow read, write: if false;
+    }
   }
 }
