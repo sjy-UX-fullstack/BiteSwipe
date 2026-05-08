@@ -4,13 +4,16 @@ export const config = {
 
 const PROMPT = `You are a professional chef. Look at this image of a fridge or pantry.
 Identify all the edible food ingredients visible.
-Return ONLY a valid JSON array of strings with ingredient names.
+Return ONLY a valid JSON array of strings with ingredient names. No prose, no markdown fences.
 Example: ["eggs", "milk", "tomatoes"]`;
+
+const MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 export default async function handler(req: any, res: any) {
   if (req.method === 'GET') {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_KEY;
-    return res.status(200).json({ status: 'ok', hasKey: !!apiKey, keyLen: apiKey?.length ?? 0 });
+    const apiKey = process.env.GROQ_API_KEY;
+    return res.status(200).json({ status: 'ok', provider: 'groq', hasKey: !!apiKey, keyLen: apiKey?.length ?? 0 });
   }
 
   if (req.method !== 'POST') {
@@ -20,43 +23,51 @@ export default async function handler(req: any, res: any) {
   const { base64, mimeType = 'image/jpeg' } = req.body ?? {};
   if (!base64) return res.status(400).json({ error: 'base64 required' });
 
-  const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY not configured on server' });
+    return res.status(500).json({ error: 'GROQ_API_KEY not configured on server' });
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
   const body = {
-    contents: [{
-      parts: [
-        { text: PROMPT },
-        { inlineData: { mimeType, data: base64 } },
-      ],
-    }],
+    model: MODEL,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: PROMPT },
+          { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+        ],
+      },
+    ],
+    temperature: 0.2,
+    max_tokens: 512,
   };
 
   try {
-    const r = await fetch(url, {
+    const r = await fetch(GROQ_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify(body),
     });
 
     const raw = await r.text();
     if (!r.ok) {
-      console.error('[api/scan] google error', r.status, raw);
+      console.error('[api/scan] groq error', r.status, raw);
       return res.status(r.status).json({
-        error: `Gemini API ${r.status}`,
+        error: `Groq API ${r.status}`,
         details: raw.slice(0, 500),
       });
     }
 
     let data: any;
     try { data = JSON.parse(raw); } catch {
-      return res.status(500).json({ error: 'Invalid JSON from Gemini', details: raw.slice(0, 300) });
+      return res.status(500).json({ error: 'Invalid JSON from Groq', details: raw.slice(0, 300) });
     }
 
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+    const text: string = data?.choices?.[0]?.message?.content ?? '';
     const start = text.indexOf('[');
     const end = text.lastIndexOf(']');
     if (start !== -1 && end !== -1) {
@@ -64,7 +75,7 @@ export default async function handler(req: any, res: any) {
         const ingredients = JSON.parse(text.substring(start, end + 1));
         return res.status(200).json({ ingredients });
       } catch (e: any) {
-        return res.status(200).json({ ingredients: [], parseError: e?.message });
+        return res.status(200).json({ ingredients: [], parseError: e?.message, rawText: text.slice(0, 300) });
       }
     }
     return res.status(200).json({ ingredients: [], rawText: text.slice(0, 300) });
