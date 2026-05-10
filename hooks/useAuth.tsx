@@ -1,6 +1,7 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import {
   onAuthStateChanged,
+  updateProfile,
   User,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -18,7 +19,7 @@ interface AuthContextData {
   user: User | null;
   loading: boolean;
   signIn: (email: string, pass: string) => Promise<void>;
-  signUp: (email: string, pass: string) => Promise<void>;
+  signUp: (email: string, pass: string, displayName?: string) => Promise<void>;
   signOut: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
 }
@@ -53,8 +54,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signInWithEmailAndPassword(auth, email, pass);
   };
 
-  const signUp = async (email: string, pass: string) => {
-    await createUserWithEmailAndPassword(auth, email, pass);
+  const signUp = async (email: string, pass: string, displayName?: string) => {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    const trimmed = displayName?.trim();
+    if (trimmed && cred.user) {
+      try {
+        await updateProfile(cred.user, { displayName: trimmed });
+      } catch (e) {
+        console.warn('[signUp] updateProfile failed', e);
+      }
+    }
   };
 
   const signOut = async () => {

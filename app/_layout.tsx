@@ -11,7 +11,8 @@ import 'react-native-reanimated';
 import { Platform, StyleSheet, View, ActivityIndicator } from 'react-native';
 import { BrandColors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
-import { useEffect } from 'react';
+import { getPrefs } from '@/services/userPrefs';
+import { useEffect, useState } from 'react';
 
 // Custom dark theme matching our brand
 const BiteSwipeTheme = {
@@ -35,20 +36,48 @@ function RootLayoutNav() {
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  // null = unknown, true/false once Firestore answers
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+
+  // Load onboarding status whenever the auth user changes.
+  useEffect(() => {
+    if (loading) return;
+    if (!user) {
+      setOnboardingComplete(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const prefs = await getPrefs();
+      if (!cancelled) setOnboardingComplete(!!prefs.onboardingComplete);
+    })();
+    return () => { cancelled = true; };
+  }, [user?.uid, loading]);
 
   useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = segments[0] === 'login' || segments[0] === 'signup';
+    const top = segments[0] as string | undefined;
+    const inAuthGroup = top === 'login' || top === 'signup';
+    const inOnboarding = top === 'onboarding';
 
-    if (!user && !inAuthGroup) {
-      // Redirect to the sign-in page.
-      router.replace('/login');
-    } else if (user && inAuthGroup) {
-      // Redirect away from the sign-in page.
-      router.replace('/(tabs)');
+    if (!user) {
+      // Not signed in — only auth screens are allowed.
+      if (!inAuthGroup) router.replace('/login');
+      return;
     }
-  }, [user, loading, segments]);
+
+    // Signed in, but we don't know onboarding status yet — wait.
+    if (onboardingComplete === null) return;
+
+    if (!onboardingComplete) {
+      // Force onboarding before anything else.
+      if (!inOnboarding) router.replace('/onboarding' as any);
+    } else {
+      // Onboarded — kick out of auth/onboarding screens into the app.
+      if (inAuthGroup || inOnboarding) router.replace('/(tabs)');
+    }
+  }, [user, loading, segments, onboardingComplete]);
 
   if (loading) {
     return (
@@ -63,6 +92,7 @@ function RootLayoutNav() {
       <Stack>
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="signup" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="modal"

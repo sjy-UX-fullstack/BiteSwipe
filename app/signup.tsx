@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function SignupScreen() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,6 +25,10 @@ export default function SignupScreen() {
   };
 
   const handleSignup = async () => {
+    if (!name.trim()) {
+      showError('Error', 'Please enter your name.');
+      return;
+    }
     if (!email || !password) {
       showError('Error', 'Please enter both email and password.');
       return;
@@ -34,7 +39,7 @@ export default function SignupScreen() {
     }
     setLoading(true);
     try {
-      await signUp(email, password);
+      await signUp(email, password, name.trim());
     } catch (e: any) {
       showError('Signup Failed', e.message || 'An error occurred.');
     } finally {
@@ -83,6 +88,21 @@ export default function SignupScreen() {
 
             <View style={styles.formContainer}>
               <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={20} color={BrandColors.textSecondary} style={styles.icon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Full name"
+                  placeholderTextColor={BrandColors.textSecondary}
+                  value={name}
+                  onChangeText={setName}
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  textContentType="name"
+                  returnKeyType="next"
+                />
+              </View>
+
+              <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={20} color={BrandColors.textSecondary} style={styles.icon} />
                 <TextInput
                   style={styles.input}
@@ -91,7 +111,9 @@ export default function SignupScreen() {
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
+                  autoComplete="email"
                   keyboardType="email-address"
+                  returnKeyType="next"
                 />
               </View>
 
@@ -103,9 +125,17 @@ export default function SignupScreen() {
                   placeholderTextColor={BrandColors.textSecondary}
                   value={password}
                   onChangeText={setPassword}
+                  autoComplete="new-password"
+                  textContentType="newPassword"
                   secureTextEntry
+                  returnKeyType="done"
+                  onSubmitEditing={handleSignup}
                 />
               </View>
+
+              <Text style={styles.privacyNote}>
+                We'll personalize your recipes — no spam, no ads, your data stays private.
+              </Text>
 
               <TouchableOpacity style={styles.signupButton} onPress={handleSignup} disabled={loading}>
                 <LinearGradient colors={['#FF6B35', '#FF2D87']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientBtn}>
@@ -168,6 +198,11 @@ const styles = StyleSheet.create({
   },
   icon: { marginRight: 12 },
   input: { flex: 1, height: 56, color: BrandColors.textPrimary, fontSize: 16 },
+  privacyNote: {
+    fontSize: 12, color: BrandColors.textTertiary,
+    textAlign: 'center', marginTop: 4, marginBottom: 4,
+    lineHeight: 16,
+  },
   signupButton: { borderRadius: 14, overflow: 'hidden', marginTop: 8 },
   gradientBtn: { height: 56, justifyContent: 'center', alignItems: 'center', borderRadius: 14 },
   signupButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },

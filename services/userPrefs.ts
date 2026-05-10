@@ -18,12 +18,27 @@ export const ALLERGEN_OPTIONS = [
 
 export type Allergen = typeof ALLERGEN_OPTIONS[number]['value'];
 
+export type CookingFor = 'self' | 'couple' | 'family';
+
+export const COOKING_FOR_OPTIONS: { value: CookingFor; label: string; sub: string; icon: string; defaultServings: number }[] = [
+  { value: 'self', label: 'Just me', sub: '1 serving', icon: 'user', defaultServings: 1 },
+  { value: 'couple', label: 'Two of us', sub: '2 servings', icon: 'users', defaultServings: 2 },
+  { value: 'family', label: 'Family', sub: '4+ servings', icon: 'home', defaultServings: 4 },
+];
+
 export interface UserPrefs {
   dietPreference: DietPreference | null;
   allergens: Allergen[];
+  cookingFor: CookingFor | null;
+  onboardingComplete: boolean;
 }
 
-const DEFAULT_PREFS: UserPrefs = { dietPreference: null, allergens: [] };
+const DEFAULT_PREFS: UserPrefs = {
+  dietPreference: null,
+  allergens: [],
+  cookingFor: null,
+  onboardingComplete: false,
+};
 
 export async function getPrefs(): Promise<UserPrefs> {
   const uid = auth.currentUser?.uid;
@@ -35,6 +50,8 @@ export async function getPrefs(): Promise<UserPrefs> {
     return {
       dietPreference: data.dietPreference ?? null,
       allergens: Array.isArray(data.allergens) ? data.allergens : [],
+      cookingFor: data.cookingFor ?? null,
+      onboardingComplete: !!data.onboardingComplete,
     };
   } catch (e) {
     console.warn('[getPrefs]', e);
