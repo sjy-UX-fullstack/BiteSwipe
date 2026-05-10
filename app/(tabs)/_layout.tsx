@@ -82,9 +82,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="feed"
         options={{
-          title: 'Feed',
+          title: 'For You',
           tabBarIcon: ({ focused }) => (
-            <TabIcon icon="users" label="Feed" focused={focused} />
+            <TabIcon icon="compass" label="For You" focused={focused} />
           ),
         }}
       />

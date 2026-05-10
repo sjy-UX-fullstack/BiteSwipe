@@ -1,199 +1,292 @@
 /**
- * Feed Screen — "Nailed It or Failed It" Community.
+ * For You — personalized recipe feed driven by the user's own data:
+ *   • Cook Again       — deduped recent cookHistory
+ *   • From Your Fridge — Groq-generated recipes from current pantry (cached daily)
+ *   • Try Something New — curated dishes filtered by cuisine affinity
  */
-import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Image, Alert, Platform } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import {
+  ActivityIndicator, Alert, Platform, ScrollView, StyleSheet,
+  Text, TouchableOpacity, View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import GlassCard from '@/components/ui/GlassCard';
+import { LinearGradient } from 'expo-linear-gradient';
 import { BrandColors, Gradients, Radius, Spacing, Typography } from '@/constants/theme';
-import { MOCK_FEED, FeedPost } from '@/constants/mock-data';
+import {
+  getCookAgainPicks, getDiscoveryPicks, getPantryReadyPicks,
+  type CookAgainItem,
+} from '@/services/forYou';
+import type { AIRecipe } from '@/services/ai';
+import { searchRecipeByName } from '@/services/ai';
+import { getPrefs } from '@/services/userPrefs';
 
-type FeedState = FeedPost & { likeCount: number; savedLocally: boolean };
+interface DiscoverySection { cuisine: string; dishes: string[] }
 
-export default function FeedScreen() {
-  const [posts, setPosts] = useState<FeedState[]>(() =>
-    MOCK_FEED.map(p => ({ ...p, likeCount: p.likes, savedLocally: false }))
-  );
+export default function ForYouScreen() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [cookAgain, setCookAgain] = useState<CookAgainItem[]>([]);
+  const [pantry, setPantry] = useState<{ recipes: AIRecipe[]; pantrySize: number; fromCache: boolean }>({
+    recipes: [], pantrySize: 0, fromCache: false,
+  });
+  const [pantryBusy, setPantryBusy] = useState(false);
+  const [discovery, setDiscovery] = useState<DiscoverySection[]>([]);
+  const [dishBusy, setDishBusy] = useState<string | null>(null);
 
-  const toggleLike = useCallback((id: string) => {
-    setPosts(prev => prev.map(p => {
-      if (p.id !== id) return p;
-      const wasLiked = p.isLiked;
-      return { ...p, isLiked: !wasLiked, likeCount: wasLiked ? p.likeCount - 1 : p.likeCount + 1 };
-    }));
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const [cooked, pant, disco] = await Promise.all([
+      getCookAgainPicks(),
+      getPantryReadyPicks(false),
+      getDiscoveryPicks(),
+    ]);
+    setCookAgain(cooked);
+    setPantry(pant);
+    setDiscovery(disco);
+    setLoading(false);
   }, []);
 
-  const toggleSave = useCallback((id: string) => {
-    setPosts(prev => prev.map(p =>
-      p.id === id ? { ...p, savedLocally: !p.savedLocally } : p
-    ));
-  }, []);
+  useFocusEffect(useCallback(() => { refresh(); }, [refresh]));
 
-  const handleComment = useCallback((post: FeedState) => {
-    if (Platform.OS === 'web') {
-      window.alert(`Comments for "${post.recipeName}" coming soon!`);
-    } else {
-      Alert.alert('Comments', `Comments for "${post.recipeName}" are coming in the next update!`);
+  const refetchPantry = async () => {
+    setPantryBusy(true);
+    try {
+      const pant = await getPantryReadyPicks(true);
+      setPantry(pant);
+    } finally {
+      setPantryBusy(false);
     }
-  }, []);
+  };
 
-  const handleShare = useCallback((post: FeedState) => {
-    if (Platform.OS === 'web') {
-      window.alert(`Share "${post.recipeName}" — share functionality coming soon!`);
+  const openCookAgain = (item: CookAgainItem) => {
+    if (item.source === 'mock' && item.recipeId) {
+      router.push({ pathname: '/modal', params: { id: item.recipeId } });
     } else {
-      Alert.alert('Share', `Share "${post.recipeName}" — coming soon!`);
-    }
-  }, []);
-
-  const handlePost = () => {
-    if (Platform.OS === 'web') {
-      window.alert('Post your dish — photo upload coming in the next update!');
-    } else {
-      Alert.alert('Post a Dish', 'Share your cooking attempt! Photo upload coming in the next update.');
+      router.push('/saved' as any);
     }
   };
 
-  const handleStoryTap = (name: string) => {
-    if (Platform.OS === 'web') {
-      window.alert(`${name}'s story — coming soon!`);
-    } else {
-      Alert.alert("Story", `${name}'s story coming soon!`);
+  const openAIRecipe = (recipe: AIRecipe) => {
+    router.push({ pathname: '/ai-recipe' as any, params: { recipe: JSON.stringify(recipe) } });
+  };
+
+  const generateDish = async (name: string) => {
+    if (dishBusy) return;
+    setDishBusy(name);
+    try {
+      const prefs = await getPrefs();
+      const recipe = await searchRecipeByName(name, prefs.dietPreference ?? 'non-veg', prefs.allergens ?? []);
+      if (!recipe) {
+        const msg = `Couldn't generate "${name}". Try again.`;
+        if (Platform.OS === 'web') window.alert(msg);
+        else Alert.alert('No recipe', msg);
+        return;
+      }
+      router.push({ pathname: '/ai-recipe' as any, params: { recipe: JSON.stringify(recipe) } });
+    } catch (e: any) {
+      const msg = e?.message ?? 'Failed to generate recipe';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Error', msg);
+    } finally {
+      setDishBusy(null);
     }
   };
+
+  const hasAnything =
+    cookAgain.length > 0 ||
+    pantry.recipes.length > 0 ||
+    pantry.pantrySize > 0 ||
+    discovery.length > 0;
 
   return (
     <View style={s.screen}>
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        {/* Header */}
-        <View style={s.header}>
-          <View>
-            <Text style={s.sub}>COMMUNITY</Text>
-            <View style={s.titleRow}>
-              <Text style={s.title}>Nailed It or Failed It</Text>
-              <Feather name="users" size={24} color={BrandColors.primaryStart} />
-            </View>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={s.scroll}
+        >
+          {/* Header */}
+          <View style={s.header}>
+            <Text style={s.title}>For You</Text>
+            <Text style={s.subtitle}>Picks based on what you cook, save, and have on hand</Text>
           </View>
-          <TouchableOpacity activeOpacity={0.7} onPress={handlePost}>
-            <LinearGradient colors={Gradients.primary as [string, string]} style={s.postBtn}>
-              <Feather name="plus" size={14} color="#fff" style={{ marginRight: 4 }} />
-              <Text style={s.postBtnT}>Post</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
-          {/* Stories */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.storiesRow}>
-            <TouchableOpacity style={s.storyWrap} onPress={handlePost} activeOpacity={0.7}>
-              <View style={[s.storyRing, { borderColor: BrandColors.dark500 }]}>
-                <LinearGradient colors={['#FF6B35', '#FF6B35']} style={s.storyInner}>
-                  <Feather name="plus" size={20} color="#fff" />
-                </LinearGradient>
+          {loading ? (
+            <View style={s.center}>
+              <ActivityIndicator color={BrandColors.primaryStart} />
+            </View>
+          ) : !hasAnything ? (
+            <View style={s.empty}>
+              <View style={s.emptyIcon}>
+                <Feather name="compass" size={36} color={BrandColors.textTertiary} />
               </View>
-              <Text style={s.storyT}>Your dish</Text>
-            </TouchableOpacity>
-            {['Priya', 'Arjun', 'Meera', 'Rohan'].map((name, i) => (
-              <TouchableOpacity key={name} style={s.storyWrap} onPress={() => handleStoryTap(name)} activeOpacity={0.7}>
-                <LinearGradient
-                  colors={i % 2 === 0 ? (Gradients.primary as [string, string]) : ['#FF2D87', '#9B2DFF']}
-                  style={s.storyRingG}
-                >
-                  <View style={s.storyInner}>
-                    <Feather name="user" size={20} color={BrandColors.textSecondary} />
-                  </View>
+              <Text style={s.emptyTitle}>Your feed is warming up</Text>
+              <Text style={s.emptyDesc}>
+                Scan your fridge, save a few recipes, or cook one — and your personal picks will show up here.
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.replace('/(tabs)/scan' as any)}
+                activeOpacity={0.85}
+                style={{ marginTop: Spacing.lg }}
+              >
+                <LinearGradient colors={Gradients.primary as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.cta}>
+                  <Feather name="camera" size={16} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={s.ctaT}>Scan your fridge</Text>
                 </LinearGradient>
-                <Text style={s.storyT}>{name}</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Feed Posts */}
-          <View style={s.feed}>
-            {posts.map((post) => (
-              <GlassCard key={post.id} style={s.postCard}>
-                {/* Post Header */}
-                <View style={s.pHeader}>
-                  <View style={s.pAvatar}>
-                    <Feather name="user" size={16} color={BrandColors.textSecondary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.pName}>{post.userName}</Text>
-                    <Text style={s.pTime}>{post.timeAgo}</Text>
-                  </View>
-                  <View style={[
-                    s.pBadge,
-                    { backgroundColor: post.badge?.includes('Nailed') ? 'rgba(46,213,115,0.15)' : 'rgba(255,71,87,0.15)' }
-                  ]}>
-                    <Text style={[
-                      s.pBadgeT,
-                      { color: post.badge?.includes('Nailed') ? BrandColors.success : BrandColors.error }
-                    ]}>
-                      {post.badge}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Post Image */}
-                <View style={s.pImgWrap}>
-                  <Image
-                    source={typeof post.image === 'string' ? { uri: post.image } : post.image}
-                    style={s.pImg}
-                    resizeMode="cover"
-                  />
-                  <LinearGradient colors={['transparent', 'rgba(0,0,0,0.6)']} style={s.pImgOverlay}>
-                    <View style={s.pRecipeTag}>
-                      <Feather name={post.icon as any} size={12} color="#fff" style={{ marginRight: 4 }} />
-                      <Text style={s.pRecipeTagT}>{post.recipeName}</Text>
+            </View>
+          ) : (
+            <>
+              {/* Cook Again */}
+              {cookAgain.length > 0 && (
+                <View style={s.section}>
+                  <View style={s.sectionHeader}>
+                    <View style={s.sectionTitleRow}>
+                      <Feather name="repeat" size={18} color={BrandColors.primaryStart} />
+                      <Text style={s.sectionTitle}>Cook Again</Text>
                     </View>
-                  </LinearGradient>
-                </View>
-
-                {/* Post Content */}
-                <View style={s.pContent}>
-                  <Text style={s.pCaption}>
-                    <Text style={s.pNameBold}>{post.userName}</Text> {post.caption}
-                  </Text>
-
-                  {/* Actions */}
-                  <View style={s.pActions}>
-                    <View style={s.pActionRow}>
-                      <TouchableOpacity style={s.pActionBtn} onPress={() => toggleLike(post.id)} activeOpacity={0.7}>
-                        <View style={[s.heartIcon, post.isLiked && s.heartIconLiked]}>
-                          <Feather
-                            name="heart"
-                            size={22}
-                            color={post.isLiked ? '#fff' : BrandColors.textPrimary}
-                          />
+                    <Text style={s.sectionSub}>{cookAgain.length}</Text>
+                  </View>
+                  <ScrollView
+                    horizontal showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={s.hRow}
+                  >
+                    {cookAgain.map((item, i) => (
+                      <TouchableOpacity
+                        key={`${item.recipeId ?? item.title}-${i}`}
+                        activeOpacity={0.85}
+                        onPress={() => openCookAgain(item)}
+                        style={s.repeatCard}
+                      >
+                        <View style={s.repeatIcon}>
+                          <Feather name="check-circle" size={22} color={BrandColors.success} />
                         </View>
-                        <Text style={[s.pActionNum, post.isLiked && { color: BrandColors.error }]}>
-                          {post.likeCount}
+                        <Text style={s.repeatTitle} numberOfLines={2}>{item.title}</Text>
+                        <Text style={s.repeatSub}>
+                          {item.source === 'ai' ? 'BiteSwipe AI' : 'Recipe'}
                         </Text>
                       </TouchableOpacity>
-
-                      <TouchableOpacity style={s.pActionBtn} onPress={() => handleComment(post)} activeOpacity={0.7}>
-                        <Feather name="message-circle" size={24} color={BrandColors.textPrimary} />
-                        <Text style={s.pActionNum}>{post.comments}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity style={s.pActionBtn} onPress={() => handleShare(post)} activeOpacity={0.7}>
-                        <Feather name="send" size={24} color={BrandColors.textPrimary} />
-                      </TouchableOpacity>
-                    </View>
-
-                    <TouchableOpacity onPress={() => toggleSave(post.id)} activeOpacity={0.7}>
-                      <Feather
-                        name="bookmark"
-                        size={24}
-                        color={post.savedLocally ? BrandColors.primaryStart : BrandColors.textPrimary}
-                      />
-                    </TouchableOpacity>
-                  </View>
+                    ))}
+                  </ScrollView>
                 </View>
-              </GlassCard>
-            ))}
-          </View>
+              )}
+
+              {/* From Your Fridge */}
+              <View style={s.section}>
+                <View style={s.sectionHeader}>
+                  <View style={s.sectionTitleRow}>
+                    <Feather name="package" size={18} color={BrandColors.primaryStart} />
+                    <Text style={s.sectionTitle}>From Your Fridge</Text>
+                  </View>
+                  {pantry.pantrySize > 0 && (
+                    <TouchableOpacity onPress={refetchPantry} disabled={pantryBusy} hitSlop={8}>
+                      {pantryBusy
+                        ? <ActivityIndicator size="small" color={BrandColors.primaryStart} />
+                        : <Feather name="refresh-cw" size={16} color={BrandColors.primaryStart} />}
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {pantry.pantrySize === 0 ? (
+                  <TouchableOpacity
+                    onPress={() => router.replace('/(tabs)/scan' as any)}
+                    activeOpacity={0.8}
+                    style={s.pantryEmptyCard}
+                  >
+                    <Feather name="camera" size={20} color={BrandColors.primaryStart} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.pantryEmptyT}>Scan your fridge to unlock recipes</Text>
+                      <Text style={s.pantryEmptySub}>We'll suggest meals based on what's actually there.</Text>
+                    </View>
+                    <Feather name="chevron-right" size={18} color={BrandColors.textTertiary} />
+                  </TouchableOpacity>
+                ) : pantry.recipes.length === 0 ? (
+                  <View style={s.pantryEmptyCard}>
+                    <Feather name="package" size={20} color={BrandColors.textTertiary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.pantryEmptyT}>{pantry.pantrySize} items in your pantry</Text>
+                      <Text style={s.pantryEmptySub}>Tap refresh to generate recipes from them.</Text>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={s.pantryHint}>
+                      Generated from {pantry.pantrySize} pantry items{pantry.fromCache ? ' · cached' : ''}
+                    </Text>
+                    <View style={s.pantryList}>
+                      {pantry.recipes.map((r, i) => (
+                        <TouchableOpacity
+                          key={r.id ?? `pantry_${i}`}
+                          activeOpacity={0.85}
+                          onPress={() => openAIRecipe(r)}
+                          style={s.pantryCard}
+                        >
+                          <View style={s.pantryBadge}>
+                            <Feather name="zap" size={10} color="#fff" />
+                            <Text style={s.pantryBadgeT}>AI</Text>
+                          </View>
+                          <Text style={s.pantryCardT} numberOfLines={2}>{r.title}</Text>
+                          <Text style={s.pantryCardSub}>
+                            {[r.cuisine, r.cookTime, r.calories ? `${r.calories} cal` : null].filter(Boolean).join(' · ')}
+                          </Text>
+                          {typeof r.matchPercentage === 'number' && (
+                            <View style={s.matchPill}>
+                              <Text style={s.matchPillT}>{r.matchPercentage}% match</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </View>
+
+              {/* Try Something New */}
+              {discovery.length > 0 && (
+                <View style={s.section}>
+                  <View style={s.sectionHeader}>
+                    <View style={s.sectionTitleRow}>
+                      <Feather name="compass" size={18} color={BrandColors.primaryStart} />
+                      <Text style={s.sectionTitle}>Try Something New</Text>
+                    </View>
+                  </View>
+                  <Text style={s.discoSub}>
+                    Inspired by cuisines you've saved
+                  </Text>
+                  {discovery.map(group => (
+                    <View key={group.cuisine} style={s.cuisineGroup}>
+                      <Text style={s.cuisineLabel}>{group.cuisine}</Text>
+                      <View style={s.dishWrap}>
+                        {group.dishes.map(dish => {
+                          const busy = dishBusy === dish;
+                          return (
+                            <TouchableOpacity
+                              key={dish}
+                              onPress={() => generateDish(dish)}
+                              disabled={dishBusy !== null}
+                              activeOpacity={0.75}
+                              style={[s.dishChip, busy && s.dishChipBusy]}
+                            >
+                              {busy ? (
+                                <ActivityIndicator size="small" color={BrandColors.primaryStart} />
+                              ) : (
+                                <Feather name="plus" size={12} color={BrandColors.primaryStart} />
+                              )}
+                              <Text style={s.dishChipT}>{dish}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+
+          <View style={{ height: 80 }} />
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -202,39 +295,106 @@ export default function FeedScreen() {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BrandColors.dark900 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
-  sub: { color: BrandColors.textTertiary, ...Typography.tiny, marginBottom: 2 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  title: { color: BrandColors.textPrimary, ...Typography.h2 },
-  postBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.full },
-  postBtnT: { color: '#fff', ...Typography.bodyBold },
-  scroll: { paddingBottom: Spacing.xxl },
-  storiesRow: { paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md, gap: Spacing.md },
-  storyWrap: { alignItems: 'center', gap: Spacing.xs },
-  storyRing: { width: 68, height: 68, borderRadius: 34, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  storyRingG: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
-  storyInner: { width: 60, height: 60, borderRadius: 30, backgroundColor: BrandColors.dark800, borderWidth: 3, borderColor: BrandColors.dark900, alignItems: 'center', justifyContent: 'center' },
-  storyT: { color: BrandColors.textSecondary, fontSize: 11, fontWeight: '500' },
-  feed: { paddingHorizontal: Spacing.lg, gap: Spacing.lg, marginTop: Spacing.sm },
-  postCard: { padding: 0, overflow: 'hidden' },
-  pHeader: { flexDirection: 'row', alignItems: 'center', padding: Spacing.sm, gap: Spacing.sm },
-  pAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: BrandColors.dark500, alignItems: 'center', justifyContent: 'center' },
-  pName: { color: BrandColors.textPrimary, ...Typography.bodyBold },
-  pTime: { color: BrandColors.textTertiary, ...Typography.caption, fontSize: 11 },
-  pBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.full },
-  pBadgeT: { fontSize: 11, fontWeight: '700' },
-  pImgWrap: { width: '100%', aspectRatio: 1 },
-  pImg: { width: '100%', height: '100%', position: 'absolute' },
-  pImgOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', padding: Spacing.sm },
-  pRecipeTag: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: Spacing.sm, paddingVertical: 6, borderRadius: Radius.full },
-  pRecipeTagT: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  pContent: { padding: Spacing.md },
-  pCaption: { color: BrandColors.textSecondary, ...Typography.body, lineHeight: 20, marginBottom: Spacing.md },
-  pNameBold: { color: BrandColors.textPrimary, fontWeight: '700' },
-  pActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pActionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.lg },
-  pActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  pActionNum: { color: BrandColors.textPrimary, ...Typography.bodyBold },
-  heartIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
-  heartIconLiked: { backgroundColor: BrandColors.error },
+  scroll: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md },
+  header: { marginBottom: Spacing.lg },
+  title: { color: BrandColors.textPrimary, ...Typography.hero, marginBottom: 4 },
+  subtitle: { color: BrandColors.textSecondary, ...Typography.body },
+  center: { paddingTop: 80, alignItems: 'center' },
+  empty: { alignItems: 'center', paddingTop: 60, paddingHorizontal: Spacing.lg, gap: Spacing.sm },
+  emptyIcon: {
+    width: 84, height: 84, borderRadius: 42,
+    backgroundColor: BrandColors.dark800,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
+  emptyTitle: { color: BrandColors.textPrimary, ...Typography.h3, textAlign: 'center' },
+  emptyDesc: { color: BrandColors.textSecondary, ...Typography.body, textAlign: 'center' },
+  cta: { flexDirection: 'row', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.md, borderRadius: Radius.full },
+  ctaT: { color: '#fff', ...Typography.bodyBold },
+
+  section: { marginBottom: Spacing.xl },
+  sectionHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  sectionTitle: { color: BrandColors.textPrimary, ...Typography.h3 },
+  sectionSub: { color: BrandColors.textTertiary, ...Typography.caption, fontWeight: '700' },
+
+  // Cook Again cards
+  hRow: { gap: Spacing.sm, paddingRight: Spacing.lg },
+  repeatCard: {
+    width: 160, padding: Spacing.md,
+    backgroundColor: BrandColors.dark800,
+    borderWidth: 1, borderColor: BrandColors.glassBorder,
+    borderRadius: Radius.lg,
+    gap: Spacing.xs,
+  },
+  repeatIcon: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: 'rgba(52,199,89,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  repeatTitle: { color: BrandColors.textPrimary, ...Typography.bodyBold, fontSize: 14 },
+  repeatSub: { color: BrandColors.textTertiary, fontSize: 11, fontWeight: '600' },
+
+  // Pantry section
+  pantryEmptyCard: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.md,
+    backgroundColor: BrandColors.dark800,
+    borderWidth: 1, borderColor: BrandColors.glassBorder,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+  },
+  pantryEmptyT: { color: BrandColors.textPrimary, ...Typography.bodyBold, fontSize: 14 },
+  pantryEmptySub: { color: BrandColors.textTertiary, ...Typography.caption, marginTop: 2 },
+  pantryHint: { color: BrandColors.textTertiary, ...Typography.caption, marginBottom: Spacing.sm },
+  pantryList: { gap: Spacing.sm },
+  pantryCard: {
+    backgroundColor: BrandColors.dark800,
+    borderWidth: 1, borderColor: BrandColors.glassBorder,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: 4,
+  },
+  pantryBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    alignSelf: 'flex-start',
+    backgroundColor: BrandColors.primaryStart,
+    paddingHorizontal: 8, paddingVertical: 3,
+    borderRadius: Radius.full,
+    marginBottom: 4,
+  },
+  pantryBadgeT: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 0.4 },
+  pantryCardT: { color: BrandColors.textPrimary, ...Typography.bodyBold, fontSize: 15 },
+  pantryCardSub: { color: BrandColors.textTertiary, ...Typography.caption },
+  matchPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(52,199,89,0.15)',
+    borderWidth: 1, borderColor: 'rgba(52,199,89,0.4)',
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: Radius.full,
+    marginTop: 4,
+  },
+  matchPillT: { color: BrandColors.success, fontSize: 10, fontWeight: '800' },
+
+  // Discovery
+  discoSub: { color: BrandColors.textTertiary, ...Typography.caption, marginBottom: Spacing.md },
+  cuisineGroup: { marginBottom: Spacing.md },
+  cuisineLabel: {
+    color: BrandColors.textSecondary,
+    fontSize: 12, fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: 0.6,
+    marginBottom: Spacing.xs,
+  },
+  dishWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  dishChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,107,53,0.08)',
+    borderWidth: 1, borderColor: 'rgba(255,107,53,0.3)',
+    paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
+  },
+  dishChipBusy: { opacity: 0.7 },
+  dishChipT: { color: BrandColors.primaryStart, ...Typography.caption, fontWeight: '700' },
 });

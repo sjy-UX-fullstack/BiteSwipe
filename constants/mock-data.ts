@@ -30,21 +30,6 @@ export interface TrendingItem {
   icon: string;
 }
 
-export interface FeedPost {
-  id: string;
-  userName: string;
-  userAvatar: string;
-  timeAgo: string;
-  recipeName: string;
-  image: any;
-  icon: string;
-  likes: number;
-  comments: number;
-  caption: string;
-  isLiked: boolean;
-  badge?: string;
-}
-
 // ─── Recipe Data ─────────────────────────────────────────────────
 export const MOCK_RECIPES: Recipe[] = [
   {
@@ -241,38 +226,6 @@ export const MOCK_TRENDING: TrendingItem[] = [
     views: '12.3M',
     image: require('../assets/food/butter_chicken.jpg'), // Reusing for mock
     icon: 'droplet',
-  },
-];
-
-// ─── Community Feed Data ─────────────────────────────────────────
-export const MOCK_FEED: FeedPost[] = [
-  {
-    id: 'f1',
-    userName: 'Priya Sharma',
-    userAvatar: 'user', // Feather icon
-    timeAgo: '2h ago',
-    recipeName: 'Paneer Tikka',
-    image: require('../assets/food/butter_chicken.jpg'),
-    icon: 'zap',
-    likes: 234,
-    comments: 18,
-    caption: 'First attempt at restaurant-style paneer tikka and I\'m SHOOK 🤯',
-    isLiked: false,
-    badge: 'Nailed It! 🏆',
-  },
-  {
-    id: 'f2',
-    userName: 'Arjun Patel',
-    userAvatar: 'user',
-    timeAgo: '5h ago',
-    recipeName: 'Chocolate Lava Cake',
-    image: require('../assets/food/pizza.jpg'),
-    icon: 'alert-circle',
-    likes: 567,
-    comments: 42,
-    caption: 'It was supposed to be a lava cake... it became a lava LAKE 🌋💀',
-    isLiked: true,
-    badge: 'Failed It! 😂',
   },
 ];
 
