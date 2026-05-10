@@ -1,7 +1,7 @@
 /**
  * User preferences — dietary preference + allergens — stored in Firestore at users/{uid}.
  */
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from './firebase';
 import type { DietPreference } from './ai';
 
@@ -67,4 +67,22 @@ export async function savePrefs(prefs: Partial<UserPrefs>): Promise<void> {
     { ...prefs, updatedAt: serverTimestamp() },
     { merge: true },
   );
+}
+
+/**
+ * Subscribes to the user's onboardingComplete flag in real time.
+ * Fires immediately with the current value (true/false), then again on every change.
+ */
+export function watchOnboardingComplete(
+  uid: string,
+  cb: (complete: boolean) => void,
+): () => void {
+  const ref = doc(db, 'users', uid);
+  return onSnapshot(ref, (snap) => {
+    const data = snap.data();
+    cb(!!data?.onboardingComplete);
+  }, (err) => {
+    console.warn('[watchOnboardingComplete]', err);
+    cb(false);
+  });
 }

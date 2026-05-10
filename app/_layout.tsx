@@ -11,7 +11,7 @@ import 'react-native-reanimated';
 import { Platform, StyleSheet, View, ActivityIndicator } from 'react-native';
 import { BrandColors } from '@/constants/theme';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
-import { getPrefs } from '@/services/userPrefs';
+import { watchOnboardingComplete } from '@/services/userPrefs';
 import { useEffect, useState } from 'react';
 
 // Custom dark theme matching our brand
@@ -39,19 +39,16 @@ function RootLayoutNav() {
   // null = unknown, true/false once Firestore answers
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
 
-  // Load onboarding status whenever the auth user changes.
+  // Subscribe to the user doc so onboardingComplete updates live —
+  // critical so finishing onboarding doesn't loop back into it.
   useEffect(() => {
     if (loading) return;
     if (!user) {
       setOnboardingComplete(null);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      const prefs = await getPrefs();
-      if (!cancelled) setOnboardingComplete(!!prefs.onboardingComplete);
-    })();
-    return () => { cancelled = true; };
+    const unsub = watchOnboardingComplete(user.uid, setOnboardingComplete);
+    return unsub;
   }, [user?.uid, loading]);
 
   useEffect(() => {
