@@ -5,7 +5,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet,
-  Text, TouchableOpacity, View,
+  Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -39,6 +39,7 @@ export default function MealPlannerScreen() {
   const [pickerSlot, setPickerSlot] = useState<MealSlot | null>(null);
   const [saved, setSaved] = useState<SavedRecipe[]>([]);
   const [savedLoading, setSavedLoading] = useState(false);
+  const [customText, setCustomText] = useState('');
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -57,17 +58,13 @@ export default function MealPlannerScreen() {
     setSavedLoading(false);
   };
 
-  const closePicker = () => setPickerSlot(null);
+  const closePicker = () => {
+    setPickerSlot(null);
+    setCustomText('');
+  };
 
-  const assign = async (recipe: SavedRecipe) => {
+  const persistMeal = async (planned: PlannedRecipe) => {
     if (!pickerSlot) return;
-    const planned: PlannedRecipe = {
-      recipeId: recipe.id,
-      title: recipe.title,
-      source: 'saved',
-      cookTime: recipe.cookTime,
-      image: recipe.image,
-    };
     const dateK = dateKey(days[selectedIdx]);
     // Optimistic update
     setEntries(prev => ({
@@ -83,6 +80,25 @@ export default function MealPlannerScreen() {
       else Alert.alert('Error', msg);
       refresh();
     }
+  };
+
+  const assign = (recipe: SavedRecipe) =>
+    persistMeal({
+      recipeId: recipe.id,
+      title: recipe.title,
+      source: 'saved',
+      cookTime: recipe.cookTime,
+      image: recipe.image,
+    });
+
+  const addCustom = () => {
+    const title = customText.trim();
+    if (!title) return;
+    persistMeal({
+      recipeId: `custom_${Date.now()}`,
+      title,
+      source: 'custom',
+    });
   };
 
   const remove = (slot: MealSlot) => {
@@ -115,10 +131,11 @@ export default function MealPlannerScreen() {
   };
 
   const openRecipe = (planned: PlannedRecipe) => {
+    if (planned.source === 'custom') return; // No underlying recipe
     if (planned.source === 'mock') {
       router.push({ pathname: '/modal', params: { id: planned.recipeId } });
     } else {
-      // For saved/ai, pass minimal data — full recipe lives in /saved.
+      // For saved/ai, full recipe lives in /saved.
       router.push('/saved' as any);
     }
   };
@@ -209,16 +226,24 @@ export default function MealPlannerScreen() {
                     <View style={s.plannedRow}>
                       <TouchableOpacity
                         style={{ flex: 1 }}
-                        activeOpacity={0.75}
+                        activeOpacity={planned.source === 'custom' ? 1 : 0.75}
                         onPress={() => openRecipe(planned)}
+                        disabled={planned.source === 'custom'}
                       >
                         <Text style={s.plannedTitle} numberOfLines={2}>{planned.title}</Text>
-                        {planned.cookTime && (
-                          <View style={s.plannedMeta}>
-                            <Feather name="clock" size={11} color={BrandColors.textTertiary} />
-                            <Text style={s.plannedMetaT}>{planned.cookTime}</Text>
-                          </View>
-                        )}
+                        <View style={s.plannedMeta}>
+                          {planned.source === 'custom' ? (
+                            <>
+                              <Feather name="edit-3" size={11} color={BrandColors.textTertiary} />
+                              <Text style={s.plannedMetaT}>Custom entry</Text>
+                            </>
+                          ) : planned.cookTime ? (
+                            <>
+                              <Feather name="clock" size={11} color={BrandColors.textTertiary} />
+                              <Text style={s.plannedMetaT}>{planned.cookTime}</Text>
+                            </>
+                          ) : null}
+                        </View>
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => remove(slot)} hitSlop={8} style={s.removeBtn}>
                         <Feather name="x" size={16} color={BrandColors.textTertiary} />
@@ -260,33 +285,67 @@ export default function MealPlannerScreen() {
                 <Feather name="x" size={20} color={BrandColors.textPrimary} />
               </TouchableOpacity>
             </View>
-            {savedLoading ? (
-              <View style={s.center}>
-                <ActivityIndicator color={BrandColors.primaryStart} />
-              </View>
-            ) : saved.length === 0 ? (
-              <View style={s.empty}>
-                <View style={s.emptyIcon}>
-                  <Feather name="bookmark" size={32} color={BrandColors.textTertiary} />
-                </View>
-                <Text style={s.emptyTitle}>No saved recipes yet</Text>
-                <Text style={s.emptyDesc}>
-                  Save recipes from Search, Scan, or Swipe — then plan them here.
-                </Text>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ padding: Spacing.lg }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Custom entry */}
+              <Text style={s.pickerSection}>Add a custom meal</Text>
+              <View style={s.customRow}>
+                <TextInput
+                  style={s.customInput}
+                  placeholder="e.g. Leftover pasta, Order pizza…"
+                  placeholderTextColor={BrandColors.textTertiary}
+                  value={customText}
+                  onChangeText={setCustomText}
+                  onSubmitEditing={addCustom}
+                  returnKeyType="done"
+                  maxLength={80}
+                />
                 <TouchableOpacity
-                  onPress={() => { closePicker(); router.replace('/(tabs)/search' as any); }}
+                  onPress={addCustom}
+                  disabled={customText.trim().length === 0}
                   activeOpacity={0.85}
-                  style={{ marginTop: Spacing.lg }}
                 >
-                  <LinearGradient colors={Gradients.primary as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.cta}>
-                    <Feather name="search" size={16} color="#fff" style={{ marginRight: 8 }} />
-                    <Text style={s.ctaT}>Find a recipe</Text>
+                  <LinearGradient
+                    colors={
+                      (customText.trim().length === 0
+                        ? ['#444', '#666']
+                        : Gradients.primary) as [string, string]
+                    }
+                    start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                    style={s.customAddBtn}
+                  >
+                    <Feather name="plus" size={18} color="#fff" />
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: Spacing.lg }}>
-                {saved.map(r => (
+
+              {/* Saved recipes */}
+              <Text style={[s.pickerSection, { marginTop: Spacing.xl }]}>From your saved recipes</Text>
+              {savedLoading ? (
+                <View style={{ paddingVertical: Spacing.xl, alignItems: 'center' }}>
+                  <ActivityIndicator color={BrandColors.primaryStart} />
+                </View>
+              ) : saved.length === 0 ? (
+                <View style={s.savedEmpty}>
+                  <Text style={s.savedEmptyT}>
+                    No saved recipes yet. Bookmark recipes from Search, Scan, or Swipe — they'll appear here.
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => { closePicker(); router.replace('/(tabs)/search' as any); }}
+                    activeOpacity={0.85}
+                    style={{ marginTop: Spacing.md }}
+                  >
+                    <LinearGradient colors={Gradients.primary as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.cta}>
+                      <Feather name="search" size={16} color="#fff" style={{ marginRight: 8 }} />
+                      <Text style={s.ctaT}>Find a recipe</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                saved.map(r => (
                   <TouchableOpacity
                     key={r.id}
                     activeOpacity={0.8}
@@ -302,10 +361,10 @@ export default function MealPlannerScreen() {
                     </View>
                     <Feather name="chevron-right" size={20} color={BrandColors.textTertiary} />
                   </TouchableOpacity>
-                ))}
-                <View style={{ height: Spacing.xxl }} />
-              </ScrollView>
-            )}
+                ))
+              )}
+              <View style={{ height: Spacing.xxl }} />
+            </ScrollView>
           </SafeAreaView>
         </View>
       </Modal>
@@ -390,6 +449,37 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: BrandColors.glassBorder,
   },
   modalTitle: { color: BrandColors.textPrimary, ...Typography.h3, flex: 1 },
+  pickerSection: {
+    color: BrandColors.textSecondary,
+    fontSize: 12, fontWeight: '700',
+    textTransform: 'uppercase', letterSpacing: 0.6,
+    marginBottom: Spacing.sm,
+  },
+  customRow: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' },
+  customInput: {
+    flex: 1,
+    backgroundColor: BrandColors.dark800,
+    borderWidth: 1, borderColor: BrandColors.glassBorder,
+    borderRadius: Radius.md,
+    color: BrandColors.textPrimary,
+    fontSize: 15,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+  },
+  customAddBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  savedEmpty: {
+    alignItems: 'center',
+    backgroundColor: BrandColors.dark800,
+    borderWidth: 1, borderColor: BrandColors.glassBorder,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
+  },
+  savedEmptyT: {
+    color: BrandColors.textSecondary, ...Typography.body, textAlign: 'center',
+  },
   pickItem: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
     backgroundColor: BrandColors.dark800,

@@ -12,7 +12,7 @@ export const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 export interface PlannedRecipe {
   recipeId: string;
   title: string;
-  source: 'ai' | 'mock' | 'saved';
+  source: 'ai' | 'mock' | 'saved' | 'custom';
   cookTime?: string;
   image?: string;
 }
