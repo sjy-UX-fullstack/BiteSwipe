@@ -91,15 +91,6 @@ function RootLayoutNav() {
           }}
         />
         <Stack.Screen
-          name="trending-recipe"
-          options={{
-            presentation: 'modal',
-            title: 'Recipe',
-            headerStyle: { backgroundColor: BrandColors.dark800 },
-            headerTintColor: BrandColors.textPrimary,
-          }}
-        />
-        <Stack.Screen
           name="cook-mode"
           options={{
             presentation: 'fullScreenModal',
@@ -110,6 +101,7 @@ function RootLayoutNav() {
         <Stack.Screen name="preferences" options={{ headerShown: false }} />
         <Stack.Screen name="ai-recipe" options={{ headerShown: false }} />
         <Stack.Screen name="shopping-list" options={{ headerShown: false }} />
+        <Stack.Screen name="meal-planner" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="light" />
     </ThemeProvider>

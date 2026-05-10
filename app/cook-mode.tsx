@@ -97,7 +97,7 @@ export default function CookModeScreen() {
       logCook({
         recipeId: recipeId || undefined,
         title: title || 'Recipe',
-        source: (source === 'ai' || source === 'mock' || source === 'trending') ? source : 'mock',
+        source: (source === 'ai' || source === 'mock') ? source : 'mock',
         durationSec: timerSeconds,
       }).catch(() => {});
     }

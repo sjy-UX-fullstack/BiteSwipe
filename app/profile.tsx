@@ -94,6 +94,11 @@ export default function ProfileScreen() {
             <Text style={s.menuT}>Shopping List</Text>
             <Feather name="chevron-right" size={20} color={BrandColors.textTertiary} />
           </TouchableOpacity>
+          <TouchableOpacity style={s.menuItem} onPress={() => router.push('/meal-planner' as any)}>
+            <Feather name="calendar" size={20} color={BrandColors.textSecondary} />
+            <Text style={s.menuT}>Weekly Meal Planner</Text>
+            <Feather name="chevron-right" size={20} color={BrandColors.textTertiary} />
+          </TouchableOpacity>
           <TouchableOpacity style={s.menuItem} onPress={() => router.push('/preferences' as any)}>
             <Feather name="heart" size={20} color={BrandColors.textSecondary} />
             <Text style={s.menuT}>Dietary Preferences</Text>

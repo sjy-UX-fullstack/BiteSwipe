@@ -12,7 +12,7 @@ export interface CookEntry {
   id?: string;
   recipeId?: string;
   title: string;
-  source: 'ai' | 'mock' | 'trending';
+  source: 'ai' | 'mock';
   durationSec: number;
   cookedAt?: any;
 }

@@ -79,9 +79,9 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </GlassCard>
             <GlassCard style={styles.quickAction}>
-              <TouchableOpacity style={styles.quickActionInner} onPress={() => router.push('/trending')}>
-                <Feather name="link" size={24} color={BrandColors.textPrimary} />
-                <Text style={styles.quickLabel}>Import{'\n'}Recipe</Text>
+              <TouchableOpacity style={styles.quickActionInner} onPress={() => router.push('/search' as any)}>
+                <Feather name="search" size={24} color={BrandColors.textPrimary} />
+                <Text style={styles.quickLabel}>Search{'\n'}Recipe</Text>
               </TouchableOpacity>
             </GlassCard>
           </View>

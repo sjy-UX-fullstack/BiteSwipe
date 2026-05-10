@@ -1,6 +1,6 @@
 /**
  * Saved Recipes — dedicated page listing every bookmarked recipe.
- * AI recipes route to /ai-recipe; mock/trending route to /modal.
+ * AI recipes route to /ai-recipe; mock recipes route to /modal.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import {
@@ -93,12 +93,12 @@ export default function SavedScreen() {
                     <View style={{ flex: 1 }}>
                       <View style={s.sourceBadge}>
                         <Feather
-                          name={r.source === 'ai' ? 'zap' : r.source === 'trending' ? 'trending-up' : 'book-open'}
+                          name={r.source === 'ai' ? 'zap' : 'book-open'}
                           size={10}
                           color={BrandColors.primaryStart}
                         />
                         <Text style={s.sourceT}>
-                          {r.source === 'ai' ? 'BiteSwipe AI' : r.source === 'trending' ? 'Trending' : 'Recipe'}
+                          {r.source === 'ai' ? 'BiteSwipe AI' : 'Recipe'}
                         </Text>
                       </View>
                       <Text style={s.cardTitle} numberOfLines={2}>{r.title}</Text>

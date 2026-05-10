@@ -95,70 +95,29 @@ export const generateRecipesFromIngredients = async (
 };
 
 /**
- * Asks Gemini to generate a full recipe from a title or URL text.
- * NOTE: Gemini cannot browse URLs — pass text/title only.
+ * Search by dish name → returns one detailed recipe (same shape as AIRecipe minus matchPercentage).
+ * Powered by Groq via /api/recipe-by-name.
  */
-export const parseRecipeText = async (textToParse: string): Promise<any> => {
-  const model = genAI.getGenerativeModel({ model: MODEL });
-  const prompt = `Extract or generate recipe information from this text or title.
-Return ONLY valid JSON in this exact format:
-{"title":"Recipe Name","ingredients":["ing1","ing2"],"steps":["step1","step2"],"calories":400,"cookTime":"20 min","difficulty":"Medium","cuisine":"Italian"}
-Text: ${textToParse}`;
+export const searchRecipeByName = async (
+  query: string,
+  diet: DietPreference = 'non-veg',
+  allergens: string[] = [],
+): Promise<AIRecipe | null> => {
+  const url = Platform.OS === 'web'
+    ? '/api/recipe-by-name'
+    : 'https://biteswipe-five.vercel.app/api/recipe-by-name';
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start !== -1 && end !== -1) {
-    try {
-      return JSON.parse(text.substring(start, end + 1));
-    } catch {
-      return null;
-    }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, diet, allergens }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const detail = body.details ? ` — ${body.details}` : '';
+    throw new Error((body.error ?? `Server error ${res.status}`) + detail);
   }
-  return null;
+  const data = await res.json();
+  return data.recipe ?? null;
 };
 
-/**
- * Generates a batch of trending recipe ideas for the week.
- * Used by the weekly viral recipe pull service.
- */
-export const generateViralRecipes = async (): Promise<any[]> => {
-  const model = genAI.getGenerativeModel({ model: MODEL });
-  const currentMonth = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
-  const prompt = `You are a food trend analyst. Generate 6 viral, trending recipe ideas for ${currentMonth} that are popular on Instagram Reels and YouTube Shorts in India and globally.
-Return ONLY a valid JSON array with exactly 6 objects in this format:
-[
-  {
-    "id": "viral_1",
-    "title": "Recipe Title",
-    "cuisine": "Indian/Italian/etc",
-    "cookTime": "25 min",
-    "difficulty": "Easy",
-    "calories": 450,
-    "servings": 2,
-    "source": "instagram",
-    "creator": "@creatorname",
-    "views": "4.2M",
-    "icon": "zap",
-    "tags": ["Trending", "Quick"],
-    "ingredients": ["ing1", "ing2", "ing3"],
-    "steps": ["step1", "step2", "step3"],
-    "matchPercentage": 82
-  }
-]
-Make them genuinely exciting, globally trending but cook-friendly. Mix indian and global cuisine.`;
-
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
-  const start = text.indexOf('[');
-  const end = text.lastIndexOf(']');
-  if (start !== -1 && end !== -1) {
-    try {
-      return JSON.parse(text.substring(start, end + 1));
-    } catch {
-      return [];
-    }
-  }
-  return [];
-};

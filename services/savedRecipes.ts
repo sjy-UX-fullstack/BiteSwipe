@@ -8,7 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 
-export type SavedSource = 'ai' | 'mock' | 'trending';
+export type SavedSource = 'ai' | 'mock';
 
 export interface SavedRecipe {
   id: string;
@@ -23,7 +23,7 @@ export interface SavedRecipe {
   tags?: string[];
   matchPercentage?: number;
   source: SavedSource;
-  image?: string;          // for mock/trending image URLs (mock recipes use require'd assets — skip then)
+  image?: string;          // for mock image URLs (mock recipes use require'd assets — skip then)
   savedAt?: any;
 }
 
