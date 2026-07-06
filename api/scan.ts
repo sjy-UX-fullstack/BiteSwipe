@@ -7,13 +7,16 @@ Identify all the edible food ingredients visible.
 Return ONLY a valid JSON array of strings with ingredient names. No prose, no markdown fences.
 Example: ["eggs", "milk", "tomatoes"]`;
 
-const MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+// Qwen 2.5 VL — cheap, capable vision model on OpenRouter.
+const MODEL = 'qwen/qwen-2.5-vl-72b-instruct';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const APP_TITLE = 'BiteSwipe';
+const APP_URL = 'https://biteswipe-five.vercel.app';
 
 export default async function handler(req: any, res: any) {
   if (req.method === 'GET') {
-    const apiKey = process.env.GROQ_API_KEY;
-    return res.status(200).json({ status: 'ok', provider: 'groq', hasKey: !!apiKey, keyLen: apiKey?.length ?? 0 });
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    return res.status(200).json({ status: 'ok', provider: 'openrouter', model: MODEL, hasKey: !!apiKey });
   }
 
   if (req.method !== 'POST') {
@@ -23,9 +26,9 @@ export default async function handler(req: any, res: any) {
   const { base64, mimeType = 'image/jpeg' } = req.body ?? {};
   if (!base64) return res.status(400).json({ error: 'base64 required' });
 
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'GROQ_API_KEY not configured on server' });
+    return res.status(500).json({ error: 'OPENROUTER_API_KEY not configured on server' });
   }
 
   const body = {
@@ -44,27 +47,29 @@ export default async function handler(req: any, res: any) {
   };
 
   try {
-    const r = await fetch(GROQ_URL, {
+    const r = await fetch(OPENROUTER_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': APP_URL,
+        'X-Title': APP_TITLE,
       },
       body: JSON.stringify(body),
     });
 
     const raw = await r.text();
     if (!r.ok) {
-      console.error('[api/scan] groq error', r.status, raw);
+      console.error('[api/scan] openrouter error', r.status, raw);
       return res.status(r.status).json({
-        error: `Groq API ${r.status}`,
+        error: `OpenRouter API ${r.status}`,
         details: raw.slice(0, 500),
       });
     }
 
     let data: any;
     try { data = JSON.parse(raw); } catch {
-      return res.status(500).json({ error: 'Invalid JSON from Groq', details: raw.slice(0, 300) });
+      return res.status(500).json({ error: 'Invalid JSON from OpenRouter', details: raw.slice(0, 300) });
     }
 
     const text: string = data?.choices?.[0]?.message?.content ?? '';

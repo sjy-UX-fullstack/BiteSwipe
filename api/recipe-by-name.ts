@@ -6,8 +6,11 @@ export const config = {
   api: { bodyParser: { sizeLimit: '32kb' } },
 };
 
-const MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+// DeepSeek Chat v3 — cheapest capable JSON-generating model on OpenRouter.
+const MODEL = 'deepseek/deepseek-chat';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const APP_TITLE = 'BiteSwipe';
+const APP_URL = 'https://biteswipe-five.vercel.app';
 
 function buildPrompt(query: string, diet: string, allergens: string[]) {
   const dietRule =
@@ -43,7 +46,8 @@ function slugify(s: string): string {
 
 export default async function handler(req: any, res: any) {
   if (req.method === 'GET') {
-    return res.status(200).json({ status: 'ok', provider: 'groq' });
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    return res.status(200).json({ status: 'ok', provider: 'openrouter', model: MODEL, hasKey: !!apiKey });
   }
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -60,17 +64,19 @@ export default async function handler(req: any, res: any) {
     ? allergens.filter((a: unknown) => typeof a === 'string')
     : [];
 
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'GROQ_API_KEY not configured on server' });
+    return res.status(500).json({ error: 'OPENROUTER_API_KEY not configured on server' });
   }
 
   try {
-    const r = await fetch(GROQ_URL, {
+    const r = await fetch(OPENROUTER_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': APP_URL,
+        'X-Title': APP_TITLE,
       },
       body: JSON.stringify({
         model: MODEL,
@@ -82,13 +88,13 @@ export default async function handler(req: any, res: any) {
 
     const raw = await r.text();
     if (!r.ok) {
-      console.error('[api/recipe-by-name] groq error', r.status, raw);
-      return res.status(r.status).json({ error: `Groq API ${r.status}`, details: raw.slice(0, 500) });
+      console.error('[api/recipe-by-name] openrouter error', r.status, raw);
+      return res.status(r.status).json({ error: `OpenRouter API ${r.status}`, details: raw.slice(0, 500) });
     }
 
     let data: any;
     try { data = JSON.parse(raw); } catch {
-      return res.status(500).json({ error: 'Invalid JSON from Groq' });
+      return res.status(500).json({ error: 'Invalid JSON from OpenRouter' });
     }
     const text: string = data?.choices?.[0]?.message?.content ?? '';
     const start = text.indexOf('{');
